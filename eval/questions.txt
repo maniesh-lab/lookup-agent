@@ -1,0 +1,25 @@
+DOCS | what's your return window?
+DOCS | Do I have to pay for return shipping if you sent me the wrong item, or is it only free when the product is defective?
+DOCS | How long does standard shipping usually take, and do you offer express delivery for an extra fee?
+DOCS | Does the warranty cover products I bought as a gift for someone else, and what do I need to show to make a claim?
+DOCS | Is there a free trial for the premium plan, and what happens to my premium benefits if a monthly payment fails?
+DOCS | how long do refunds take to show up on my card?
+DOCS | Can I change the delivery address after placing an order, and if the package is already out for delivery, what are my options?
+DB   | How many orders were cancelled between January 1 and January 31, 2026?
+DB   | List the names and cities of premium customers who signed up between January 1 and February 15, 2026 and placed at least one non-cancelled order over $150 before June 30, 2026.
+DB   | Which 3 products had the highest total quantity sold in orders placed between April 1 and June 30, 2026, not counting cancelled orders?
+DB   | What's the average order total for basic-plan customers in Kathmandu for non-cancelled orders placed between January 1 and June 30, 2026?
+DB   | how many customers have more than one open delivery ticket created between February 1 and May 31, 2026?
+DB   | Which customers bought something from the electronics category in a non-cancelled order dated between May 1 and May 31, 2026 and later opened a "quality" ticket on or before June 30, 2026?
+API  | What's the exchange rate from GBP to USD today?
+API  | Convert 250 euros to Indian rupees at the current rate.
+API  | what's the current rate for Australian dollars against US dollars, and how much is 500 AUD in USD?
+MIXED| Which premium customers had a delivered order between January 10 and March 31, 2026 and then opened a refund ticket between April 1 and April 30, 2026, and what does the refund policy say about premium members?
+MIXED| What was the total of the order Priya Sharma placed on February 18, 2026, in Canadian dollars at today's rate?
+MIXED| How many orders placed between March 1 and March 31, 2026 are still marked "processing", and according to the shipping policy, how long should they have taken to ship?
+MIXED| Omar Haddad has a damaged-item ticket dated May 9, 2026. What did he order on May 2, 2026, what's that order's total in GBP at today's rate, and does the damaged-item policy cover it?
+MIXED| Which basic-plan customers have a combined total of more than $300 across their non-cancelled orders placed between January 1 and June 30, 2026, and would the premium plan's free shipping rule have applied to orders of that size?
+NONE | What was the shop's profit margin for the first quarter of 2026?
+NONE | Which warehouse employee packed my order from June 2, 2026?
+NONE | Will the Blue Ridge smartwatch be back in stock before the end of July 2026?
+NONE | how many people visited the website on March 15, 2026?
