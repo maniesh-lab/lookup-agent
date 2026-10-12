@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]        # runs the FastAPI server
+pydantic-settings        # reads .env into a settings object
+sqlalchemy               # talk to Postgres from Python
+psycopg[binary]          # Postgres driver
+pgvector                 # Python side of pgvector
+sentence-transformers    # embeddings now, reranker later
+structlog                # structured logs
+httpx                    # HTTP calls and API tests
+faker                    # generates the fake shop data
+pytest
+pytest-cov
+ruff
+
