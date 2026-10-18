@@ -1,0 +1,27 @@
+[project]
+name = "lookup-agent"
+version = "0.1.0"
+description = "A LangGraph agent that looks things up in documents, Postgres and a live API before answering."
+requires-python = ">=3.11"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 110
+
+[tool.ruff.lint]
+# Listed explicitly so new ruff versions with bigger defaults don't change CI results.
+select = ["E", "F", "W", "I", "UP", "B"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's Depends()/Header() in argument defaults is the documented pattern.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Header"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = ["integration: needs a Postgres with pgvector (set TEST_DATABASE_URL)"]
+filterwarnings = ["ignore::DeprecationWarning:langfuse.*"]
+
+[tool.coverage.run]
+source = ["app", "db"]
+omit = ["app/retrieval/models.py"]  # wraps sentence-transformers; tests use fakes
