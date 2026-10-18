@@ -1,5 +1,5 @@
 services:
-  postgres:  #hostname
+  postgres:  # also the hostname other services use
     image: pgvector/pgvector:pg18
     container_name: lookup_agent_db
     environment:
@@ -10,6 +10,27 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lookup_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    container_name: lookup_agent_app
+    env_file: .env   # API keys and settings
+    environment:     # these override .env: inside Docker the database is "postgres", not localhost
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/lookup_db
+      READONLY_DATABASE_URL: postgresql://lookup_reader:lookup_reader@postgres:5432/lookup_db
+    ports:
+      - "8000:8000"
+    volumes:
+      - models:/models   # downloaded embedding/reranker models survive rebuilds
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   pgdata:
+  models:
