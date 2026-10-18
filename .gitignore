@@ -25,3 +25,7 @@ htmlcov/
 # Local data
 pgdata/
 *.log
+
+docs/status.md
+docs/build-checklist.md
+z_scratch.py
