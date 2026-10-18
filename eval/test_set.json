@@ -1,0 +1,255 @@
+{
+  "about": "Eval questions for lookup-agent. Expected answers for database questions are not written here: the scorer runs each case's truth SQL against the seeded database, so they can't drift from the data. Currency answers are checked against a live rate fetched during the run. See eval/scoring.py for how each check works.",
+  "cases": [
+    {
+      "id": "q01", "category": "DOCS",
+      "question": "what's your return window?",
+      "expected_tools": ["search_docs"], "expected_sources": ["returns.md"],
+      "must_mention": [["30 days", "30-day", "thirty days"]]
+    },
+    {
+      "id": "q02", "category": "DOCS",
+      "question": "Do I have to pay for return shipping if you sent me the wrong item, or is it only free when the product is defective?",
+      "expected_tools": ["search_docs"], "expected_sources": ["returns.md"],
+      "must_mention": [["free", "prepaid"], ["wrong"]]
+    },
+    {
+      "id": "q03", "category": "DOCS",
+      "question": "How long does standard shipping usually take, and do you offer express delivery for an extra fee?",
+      "expected_tools": ["search_docs"], "expected_sources": ["shipping.md"],
+      "must_mention": [["3 to 5", "3-5", "3–5", "three to five"], ["12.99"]]
+    },
+    {
+      "id": "q04", "category": "DOCS",
+      "question": "Does the warranty cover products I bought as a gift for someone else, and what do I need to show to make a claim?",
+      "expected_tools": ["search_docs"], "expected_sources": ["warranty.md"],
+      "must_mention": [["gift"], ["order number", "gift receipt"]]
+    },
+    {
+      "id": "q05", "category": "DOCS",
+      "question": "Is there a free trial for the premium plan, and what happens to my premium benefits if a monthly payment fails?",
+      "expected_tools": ["search_docs"], "expected_sources": ["premium-membership.md"],
+      "must_mention": [["14-day", "14 days", "14 day"], ["7-day", "7 days", "grace"]]
+    },
+    {
+      "id": "q06", "category": "DOCS",
+      "question": "how long do refunds take to show up on my card?",
+      "expected_tools": ["search_docs"], "expected_sources": ["refunds.md"],
+      "must_mention": [["5 to 10", "5-10", "5–10", "five to ten"]]
+    },
+    {
+      "id": "q07", "category": "DOCS",
+      "question": "Can I change the delivery address after placing an order, and if the package is already out for delivery, what are my options?",
+      "expected_tools": ["search_docs"], "expected_sources": ["order-changes.md"],
+      "must_mention": [["processing", "before it ships", "before the order ships"], ["pickup point", "pick-up point", "refuse"]]
+    },
+    {
+      "id": "q08", "category": "DB",
+      "question": "How many orders were cancelled between January 1 and January 31, 2026?",
+      "expected_tools": ["query_database"],
+      "truth": [{"check": "number", "sql": "SELECT count(*) FROM orders WHERE status = 'cancelled' AND order_date BETWEEN '2026-01-01' AND '2026-01-31'"}]
+    },
+    {
+      "id": "q09", "category": "DB",
+      "question": "List the names and cities of premium customers who signed up between January 1 and February 15, 2026 and placed at least one non-cancelled order over $150 before June 30, 2026.",
+      "expected_tools": ["query_database"],
+      "truth": [{"check": "names", "sql": "SELECT DISTINCT c.full_name FROM customers c JOIN orders o ON o.customer_id = c.id WHERE c.plan = 'premium' AND c.signup_date BETWEEN '2026-01-01' AND '2026-02-15' AND o.status <> 'cancelled' AND o.total > 150 AND o.order_date < '2026-06-30'"}]
+    },
+    {
+      "id": "q10", "category": "DB",
+      "question": "Which 3 products had the highest total quantity sold in orders placed between April 1 and June 30, 2026, not counting cancelled orders?",
+      "expected_tools": ["query_database"],
+      "truth": [{"check": "names", "sql": "SELECT p.name FROM order_items oi JOIN orders o ON o.id = oi.order_id JOIN products p ON p.id = oi.product_id WHERE o.status <> 'cancelled' AND o.order_date BETWEEN '2026-04-01' AND '2026-06-30' GROUP BY p.name ORDER BY sum(oi.quantity) DESC LIMIT 3"}]
+    },
+    {
+      "id": "q11", "category": "DB",
+      "question": "What's the average order total for basic-plan customers in Kathmandu for non-cancelled orders placed between January 1 and June 30, 2026?",
+      "expected_tools": ["query_database"],
+      "truth": [{"check": "number", "sql": "SELECT round(avg(o.total), 2) FROM orders o JOIN customers c ON c.id = o.customer_id WHERE c.plan = 'basic' AND c.city = 'Kathmandu' AND o.status <> 'cancelled' AND o.order_date BETWEEN '2026-01-01' AND '2026-06-30'"}]
+    },
+    {
+      "id": "q12", "category": "DB",
+      "question": "how many customers have more than one open delivery ticket created between February 1 and May 31, 2026?",
+      "expected_tools": ["query_database"],
+      "truth": [{"check": "number", "sql": "SELECT count(*) FROM (SELECT customer_id FROM support_tickets WHERE topic = 'delivery' AND status = 'open' AND created_at BETWEEN '2026-02-01' AND '2026-05-31' GROUP BY customer_id HAVING count(*) > 1) t"}]
+    },
+    {
+      "id": "q13", "category": "DB",
+      "question": "Which customers bought something from the electronics category in a non-cancelled order dated between May 1 and May 31, 2026 and later opened a \"quality\" ticket on or before June 30, 2026?",
+      "expected_tools": ["query_database"],
+      "truth": [{"check": "names", "sql": "SELECT DISTINCT c.full_name FROM customers c JOIN orders o ON o.customer_id = c.id JOIN order_items oi ON oi.order_id = o.id JOIN products p ON p.id = oi.product_id JOIN support_tickets t ON t.customer_id = c.id WHERE p.category = 'electronics' AND o.status <> 'cancelled' AND o.order_date BETWEEN '2026-05-01' AND '2026-05-31' AND t.topic = 'quality' AND t.created_at > o.order_date AND t.created_at <= '2026-06-30'"}]
+    },
+    {
+      "id": "q14", "category": "API",
+      "question": "What's the exchange rate from GBP to USD today?",
+      "expected_tools": ["convert_currency"],
+      "fx": {"amount": 1, "from": "GBP", "to": "USD"}
+    },
+    {
+      "id": "q15", "category": "API",
+      "question": "Convert 250 euros to Indian rupees at the current rate.",
+      "expected_tools": ["convert_currency"],
+      "fx": {"amount": 250, "from": "EUR", "to": "INR"}
+    },
+    {
+      "id": "q16", "category": "API",
+      "question": "what's the current rate for Australian dollars against US dollars, and how much is 500 AUD in USD?",
+      "expected_tools": ["convert_currency"],
+      "fx": {"amount": 500, "from": "AUD", "to": "USD"}
+    },
+    {
+      "id": "q17", "category": "MIXED",
+      "question": "Which premium customers had a delivered order between January 10 and March 31, 2026 and then opened a refund ticket between April 1 and April 30, 2026, and what does the refund policy say about premium members?",
+      "expected_tools": ["query_database", "search_docs"], "expected_sources": ["refunds.md"],
+      "truth": [{"check": "names", "sql": "SELECT DISTINCT c.full_name FROM customers c JOIN orders o ON o.customer_id = c.id JOIN support_tickets t ON t.customer_id = c.id WHERE c.plan = 'premium' AND o.status = 'delivered' AND o.order_date BETWEEN '2026-01-10' AND '2026-03-31' AND t.topic = 'refund' AND t.created_at BETWEEN '2026-04-01' AND '2026-04-30'"}],
+      "must_mention": [["scan", "store credit", "105%", "faster"]]
+    },
+    {
+      "id": "q18", "category": "MIXED",
+      "question": "What was the total of the order Priya Sharma placed on February 18, 2026, in Canadian dollars at today's rate?",
+      "expected_tools": ["query_database", "convert_currency"],
+      "truth": [{"check": "number", "convert_to": "CAD", "sql": "SELECT o.total FROM orders o JOIN customers c ON c.id = o.customer_id WHERE c.full_name = 'Priya Sharma' AND o.order_date = '2026-02-18'"}]
+    },
+    {
+      "id": "q19", "category": "MIXED",
+      "question": "How many orders placed between March 1 and March 31, 2026 are still marked \"processing\", and according to the shipping policy, how long should they have taken to ship?",
+      "expected_tools": ["query_database", "search_docs"], "expected_sources": ["shipping.md"],
+      "truth": [{"check": "number", "sql": "SELECT count(*) FROM orders WHERE status = 'processing' AND order_date BETWEEN '2026-03-01' AND '2026-03-31'"}],
+      "must_mention": [["2 business days", "two business days"]]
+    },
+    {
+      "id": "q20", "category": "MIXED",
+      "question": "Omar Haddad has a damaged-item ticket dated May 9, 2026. What did he order on May 2, 2026, what's that order's total in GBP at today's rate, and does the damaged-item policy cover it?",
+      "expected_tools": ["query_database", "convert_currency", "search_docs"], "expected_sources": ["damaged-items.md"],
+      "truth": [
+        {"check": "names", "sql": "SELECT p.name FROM orders o JOIN customers c ON c.id = o.customer_id JOIN order_items oi ON oi.order_id = o.id JOIN products p ON p.id = oi.product_id WHERE c.full_name = 'Omar Haddad' AND o.order_date = '2026-05-02'"},
+        {"check": "number", "convert_to": "GBP", "sql": "SELECT o.total FROM orders o JOIN customers c ON c.id = o.customer_id WHERE c.full_name = 'Omar Haddad' AND o.order_date = '2026-05-02'"}
+      ],
+      "must_mention": [["14 days", "14-day"]]
+    },
+    {
+      "id": "q21", "category": "MIXED",
+      "question": "Which basic-plan customers have a combined total of more than $1,000 across their non-cancelled orders placed between January 1 and June 30, 2026, and would the premium plan's free shipping rule have applied to orders of that size?",
+      "expected_tools": ["query_database", "search_docs"], "expected_sources": ["shipping.md"],
+      "truth": [{"check": "names", "sql": "SELECT c.full_name FROM customers c JOIN orders o ON o.customer_id = c.id WHERE c.plan = 'basic' AND o.status <> 'cancelled' AND o.order_date BETWEEN '2026-01-01' AND '2026-06-30' GROUP BY c.full_name HAVING sum(o.total) > 1000"}],
+      "must_mention": [["25"]]
+    },
+    {
+      "id": "q22", "category": "NONE",
+      "question": "What was the shop's profit margin for the first quarter of 2026?",
+      "expected_tools": [], "expect_refusal": true
+    },
+    {
+      "id": "q23", "category": "NONE",
+      "question": "Which warehouse employee packed my order from June 2, 2026?",
+      "expected_tools": [], "expect_refusal": true
+    },
+    {
+      "id": "q24", "category": "NONE",
+      "question": "Will the Blue Ridge smartwatch be back in stock before the end of July 2026?",
+      "expected_tools": [], "expect_refusal": true
+    },
+    {
+      "id": "q25", "category": "NONE",
+      "question": "how many people visited the website on March 15, 2026?",
+      "expected_tools": [], "expect_refusal": true
+    },
+    {
+      "id": "q26", "category": "DOCS",
+      "question": "Can I return a vitamin C serum I've already opened?",
+      "expected_tools": ["search_docs"], "expected_sources": ["returns.md"],
+      "must_mention": [["cannot", "can't", "can not", "not be returned", "non-returnable", "not returnable", "aren't returnable", "isn't returnable"]]
+    },
+    {
+      "id": "q27", "category": "DOCS",
+      "question": "How much does Premium cost per month?",
+      "expected_tools": ["search_docs"], "expected_sources": ["premium-membership.md"],
+      "must_mention": [["8.99"]]
+    },
+    {
+      "id": "q28", "category": "DOCS",
+      "question": "How quickly do premium members get a reply from support?",
+      "expected_tools": ["search_docs"], "expected_sources": ["support.md", "premium-membership.md"],
+      "must_mention": [["12 hours"]]
+    },
+    {
+      "id": "q29", "category": "DOCS",
+      "question": "Which payment methods can I use in Nepal?",
+      "expected_tools": ["search_docs"], "expected_sources": ["payments.md"],
+      "must_mention": [["eSewa"]]
+    },
+    {
+      "id": "q30", "category": "DOCS",
+      "question": "My mug arrived cracked. How long do I have to report it?",
+      "expected_tools": ["search_docs"], "expected_sources": ["damaged-items.md"],
+      "must_mention": [["14 days", "14-day"]]
+    },
+    {
+      "id": "q31", "category": "DOCS",
+      "question": "Will I be charged in my own currency?",
+      "expected_tools": ["search_docs"], "expected_sources": ["payments.md"],
+      "must_mention": [["USD", "US dollar"]]
+    },
+    {
+      "id": "q32", "category": "DOCS",
+      "question": "Can I still cancel my order after it has shipped?",
+      "expected_tools": ["search_docs"], "expected_sources": ["order-changes.md"],
+      "must_mention": [["return"]]
+    },
+    {
+      "id": "q33", "category": "DB",
+      "question": "How many premium customers live in Kathmandu?",
+      "expected_tools": ["query_database"],
+      "truth": [{"check": "number", "sql": "SELECT count(*) FROM customers WHERE plan = 'premium' AND city = 'Kathmandu'"}]
+    },
+    {
+      "id": "q34", "category": "DB",
+      "question": "What is the most expensive product in the electronics category?",
+      "expected_tools": ["query_database"],
+      "truth": [{"check": "names", "sql": "SELECT name FROM products WHERE category = 'electronics' ORDER BY price DESC LIMIT 1"}]
+    },
+    {
+      "id": "q35", "category": "DB",
+      "question": "How many support tickets are still open?",
+      "expected_tools": ["query_database"],
+      "truth": [{"check": "number", "sql": "SELECT count(*) FROM support_tickets WHERE status = 'open'"}]
+    },
+    {
+      "id": "q36", "category": "DB",
+      "question": "What was the total value of delivered orders placed in March 2026?",
+      "expected_tools": ["query_database"],
+      "truth": [{"check": "number", "sql": "SELECT sum(total) FROM orders WHERE status = 'delivered' AND order_date BETWEEN '2026-03-01' AND '2026-03-31'"}]
+    },
+    {
+      "id": "q37", "category": "DB",
+      "question": "Which city has the most customers?",
+      "expected_tools": ["query_database"],
+      "truth": [{"check": "names", "sql": "SELECT city FROM customers GROUP BY city ORDER BY count(*) DESC LIMIT 1"}]
+    },
+    {
+      "id": "q38", "category": "API",
+      "question": "How many Canadian dollars is 100 US dollars right now?",
+      "expected_tools": ["convert_currency"],
+      "fx": {"amount": 100, "from": "USD", "to": "CAD"}
+    },
+    {
+      "id": "q39", "category": "MIXED",
+      "question": "How much did Grace Okafor pay for her order on May 12, 2026 in Australian dollars, and how long is the warranty on it for her?",
+      "expected_tools": ["query_database", "convert_currency", "search_docs"], "expected_sources": ["warranty.md"],
+      "truth": [{"check": "number", "convert_to": "AUD", "sql": "SELECT o.total FROM orders o JOIN customers c ON c.id = o.customer_id WHERE c.full_name = 'Grace Okafor' AND o.order_date = '2026-05-12'"}],
+      "must_mention": [["2 years", "two years", "24 months", "2-year"]]
+    },
+    {
+      "id": "q40", "category": "MIXED",
+      "question": "How many open delivery tickets does Bikash Tamang have, and what does the shipping policy say to do about a delayed order?",
+      "expected_tools": ["query_database", "search_docs"], "expected_sources": ["shipping.md"],
+      "truth": [{"check": "number", "sql": "SELECT count(*) FROM support_tickets t JOIN customers c ON c.id = t.customer_id WHERE c.full_name = 'Bikash Tamang' AND t.topic = 'delivery' AND t.status = 'open'"}],
+      "must_mention": [["ticket"]]
+    },
+    {
+      "id": "q41", "category": "NONE",
+      "question": "Who is the CEO of Lumen Lane?",
+      "expected_tools": [], "expect_refusal": true
+    }
+  ]
+}

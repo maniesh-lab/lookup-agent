@@ -18,7 +18,7 @@ MIXED| Which premium customers had a delivered order between January 10 and Marc
 MIXED| What was the total of the order Priya Sharma placed on February 18, 2026, in Canadian dollars at today's rate?
 MIXED| How many orders placed between March 1 and March 31, 2026 are still marked "processing", and according to the shipping policy, how long should they have taken to ship?
 MIXED| Omar Haddad has a damaged-item ticket dated May 9, 2026. What did he order on May 2, 2026, what's that order's total in GBP at today's rate, and does the damaged-item policy cover it?
-MIXED| Which basic-plan customers have a combined total of more than $300 across their non-cancelled orders placed between January 1 and June 30, 2026, and would the premium plan's free shipping rule have applied to orders of that size?
+MIXED| Which basic-plan customers have a combined total of more than $1,000 across their non-cancelled orders placed between January 1 and June 30, 2026, and would the premium plan's free shipping rule have applied to orders of that size?
 NONE | What was the shop's profit margin for the first quarter of 2026?
 NONE | Which warehouse employee packed my order from June 2, 2026?
 NONE | Will the Blue Ridge smartwatch be back in stock before the end of July 2026?

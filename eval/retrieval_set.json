@@ -1,0 +1,31 @@
+{
+  "about": "Search hit-rate set: for each query, the policy file that should come back in the top k results. Phrased the way customers write, not copied from the documents.",
+  "queries": [
+    {"query": "what's your return window?", "expected_source": "returns.md"},
+    {"query": "do I pay to send back the wrong item you shipped me", "expected_source": "returns.md"},
+    {"query": "can I send back an opened face serum", "expected_source": "returns.md"},
+    {"query": "how do I start a return", "expected_source": "returns.md"},
+    {"query": "how long until my money is back on my card", "expected_source": "refunds.md"},
+    {"query": "refund rules for premium members", "expected_source": "refunds.md"},
+    {"query": "is the original delivery fee refunded", "expected_source": "refunds.md"},
+    {"query": "how many days does standard delivery take", "expected_source": "shipping.md"},
+    {"query": "is there a faster delivery option and what does it cost", "expected_source": "shipping.md"},
+    {"query": "my order has been processing for a week", "expected_source": "shipping.md"},
+    {"query": "minimum order for free shipping", "expected_source": "shipping.md"},
+    {"query": "is there a free trial of premium", "expected_source": "premium-membership.md"},
+    {"query": "my monthly membership payment didn't go through", "expected_source": "premium-membership.md"},
+    {"query": "how much is the membership per year", "expected_source": "premium-membership.md"},
+    {"query": "is a present I bought for my brother covered by the guarantee", "expected_source": "warranty.md"},
+    {"query": "what proof do I need for a warranty claim", "expected_source": "warranty.md"},
+    {"query": "I dropped my headphones, is that covered", "expected_source": "warranty.md"},
+    {"query": "the speaker arrived with a cracked grille", "expected_source": "damaged-items.md"},
+    {"query": "how long do I have to report a broken item", "expected_source": "damaged-items.md"},
+    {"query": "can I change my shipping address after ordering", "expected_source": "order-changes.md"},
+    {"query": "the parcel is already out for delivery and I'm not home", "expected_source": "order-changes.md"},
+    {"query": "how do I cancel my order", "expected_source": "order-changes.md"},
+    {"query": "can I pay with eSewa", "expected_source": "payments.md"},
+    {"query": "will my card be charged in rupees or dollars", "expected_source": "payments.md"},
+    {"query": "how fast does support reply to tickets", "expected_source": "support.md"},
+    {"query": "what are your customer service hours", "expected_source": "support.md"}
+  ]
+}
