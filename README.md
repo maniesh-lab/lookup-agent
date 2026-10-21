@@ -68,6 +68,7 @@ The reply has `answer`, `sources`, `tools_used` and a `thread_id`. Send the `thr
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
+pip install torch --index-url https://download.pytorch.org/whl/cpu   # CPU-only build, much smaller
 pip install -r requirements.txt
 cp .env.example .env                     # add GROQ_API_KEY
 docker compose up -d postgres            # just the database
@@ -97,6 +98,21 @@ Every response carries an `X-Request-ID` header. The same id is on every log lin
 ## Safety of the SQL tool
 
 The model writes its own SQL, so it runs inside four layers: only single `SELECT` statements pass the check; it connects as a database user that can only read the five shop tables; every transaction is read-only with a 5-second timeout; and at most 100 rows come back.
+
+## Evals
+
+| File | What it is |
+|---|---|
+| `eval/questions.txt` | The first 25 draft questions, one per line with their type |
+| `eval/test_set.json` | The full set of 41 questions with the checks for each one (the drafts are q01 to q25) |
+| `eval/retrieval_set.json` | 26 search queries with the policy file each should find |
+| `eval/results/` | Saved runs; `summary.md` keeps one line per run |
+
+```bash
+python -m eval.run_retrieval_eval            # search hit rate per layer
+python -m eval.run_eval --prompt v1          # full agent eval with prompt v1
+python -m eval.run_eval --prompt v2 --delay 3   # pause between questions if you hit rate limits
+```
 
 ## Tests
 
