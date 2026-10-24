@@ -80,6 +80,7 @@ Built on [Steadfast](https://github.com/maniesh-lab/steadfast), a reliability la
 
 - `test_set.json`: 41 questions across five types: DOCS, DB, API, MIXED (several sources) and NONE (the data doesn't exist and the agent should say so). Database answers aren't hard-coded: the scorer runs each case's "truth SQL" against the seeded database. Currency answers are checked against a live rate fetched during the run.
 - `run_eval.py`: runs the set through the real agent for a given prompt version and records pass rate, tool choice and tokens in `eval/results/`.
+- `rescore.py`: scores a saved run again after the scoring rules change, without new AI calls.
 - `run_retrieval_eval.py`: hit rate @5 and MRR for each search layer.
 
 ### Observability

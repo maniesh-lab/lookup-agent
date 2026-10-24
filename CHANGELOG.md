@@ -18,8 +18,17 @@ First full version.
 - **Docker**: Dockerfile and a Compose file that starts Postgres and the API, building the database on first start.
 - **Docs**: `docs/architecture.md` with a diagram, and this README.
 
+### Fixed (after the first real eval run, 2026-10-24)
+- The scorer failed correct answers that used lookalike characters (non-breaking hyphens, narrow no-break spaces inside names and as thousands separators). Text is now normalized before every check.
+- Refusal detection now also accepts "doesn't record" / "don't keep track" wording.
+
+### Added (after the first real eval run)
+- `eval/rescore.py`: score a saved run again without new AI calls, using the exchange rates of the run's day.
+- Eval results now save each answer's sources, the expected values and the rate date, so later re-scoring is exact.
+- `convert()` takes an optional `on_date` for historical rates.
+- First measured results in the README.
+
 ### Not done yet
-- Eval and hit-rate numbers in the README (needs a run with an API key)
 - Codecov token for the coverage badge
 - Steadfast 0.3.0 on PyPI (installed from GitHub for now)
 - Full `docker compose up --build` check, live deploy or demo GIF

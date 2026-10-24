@@ -35,15 +35,34 @@ The agent loops between the LLM and the tools until it has an answer, with a ste
 
 ## Results
 
-Measured with the scripts in `eval/`; numbers go here only after a real run.
+Measured on 2026-10-24 with `openai/gpt-oss-20b` on Groq (free tier), 41 questions per run, one run per prompt version.
 
-| What | Script | Result |
+**Search** (26 queries, `python -m eval.run_retrieval_eval`):
+
+| Layer | Hit rate @5 | MRR |
 |---|---|---|
-| Search hit rate @5 (vector / hybrid / reranked) | `python -m eval.run_retrieval_eval` | not run yet |
-| Agent eval, prompt v1 (41 questions) | `python -m eval.run_eval --prompt v1` | not run yet |
-| Agent eval, prompt v2 (41 questions) | `python -m eval.run_eval --prompt v2` | not run yet |
+| Vector | 100% (26/26) | 1.00 |
+| Hybrid (vector + keyword, RRF) | 100% (26/26) | 0.97 |
+| Hybrid + reranker | 100% (26/26) | 0.96 |
 
-The eval has five question types: DOCS, DB, API, MIXED (several sources in one question) and NONE (the answer isn't in any source). Expected database answers are computed from the database at run time and currency answers from a live rate, so the checks can't go stale. Each run is saved in `eval/results/`.
+**Agent** (`python -m eval.run_eval`, scored by rules, see `eval/scoring.py`):
+
+| | Prompt v1 | Prompt v2 |
+|---|---|---|
+| Passed | 41/41 | 41/41 |
+| Picked the right tools | 41/41 | 41/41 |
+| Tool calls, total | 59 | 52 |
+| Tool calls on unanswerable (NONE) questions | 7 | 1 |
+| Median answer length | 349 characters | 189 characters |
+| Tokens used | 117,683 | 136,198 |
+
+How to read this:
+
+- **Both prompts pass every rule-based check, so this test set can't tell them apart.** The first scoring pass reported 78% (v1) and 80% (v2), but almost every failure was the scorer's fault: the model writes lookalike characters (a non-breaking hyphen in "USB‑C", narrow spaces in "26 568"). After fixing the scorer, both saved runs were re-scored without new AI calls (`python -m eval.rescore`).
+- **The real differences only show up when reading the answers.** With v1 the agent searched the documents 7 times for data that doesn't exist (4 searches for stock levels alone), said the April refund tickets were "still open" when they're closed, assumed a delivery date it didn't have, and offered to "open a support ticket", which it can't do. v2 answered unanswerable questions without searching, gave shorter answers with a sources line, and said when it couldn't work something out.
+- **v2 costs about 16% more tokens**, because its system prompt is longer and is sent with every call.
+- **Search is saturated too.** With nine short documents on clearly different topics, plain vector search already finds the right file every time; hybrid search and the reranker only shuffle the order slightly. They would matter on a bigger or messier document set.
+- **Small sample**: one run per prompt, one model.
 
 ## Quick start (Docker)
 
@@ -107,11 +126,13 @@ The model writes its own SQL, so it runs inside four layers: only single `SELECT
 | `eval/test_set.json` | The full set of 41 questions with the checks for each one (the drafts are q01 to q25) |
 | `eval/retrieval_set.json` | 26 search queries with the policy file each should find |
 | `eval/results/` | Saved runs; `summary.md` keeps one line per run |
+| `eval/rescore.py` | Re-scores a saved run after the scoring rules change, without new AI calls |
 
 ```bash
 python -m eval.run_retrieval_eval            # search hit rate per layer
 python -m eval.run_eval --prompt v1          # full agent eval with prompt v1
 python -m eval.run_eval --prompt v2 --delay 3   # pause between questions if you hit rate limits
+python -m eval.rescore eval/results/v2-<time>.json   # score a saved run again
 ```
 
 ## Tests
@@ -150,7 +171,7 @@ All settings come from `.env` (see `.env.example`). The main ones: `LLM_PROVIDER
 
 - Exchange rates are European Central Bank reference rates, published once per working day, so "today's rate" is the latest published one (the answer shows its date).
 - The fake shop data covers January to June 2026 only, and all prices are in USD.
-- Eval answer checks are simple text rules (a number, names or key phrases must appear), which can miss a correct answer worded in an unexpected way.
+- Eval answer checks are simple text rules (a number, names or key phrases must appear). They can miss a correct answer worded in an unexpected way, and they don't catch an extra wrong claim inside an otherwise correct answer. Both prompt versions score 41/41, so the set needs harder questions to compare prompts.
 - Steadfast 0.3 (with tool calling) is installed from GitHub until it's published to PyPI.
 
 ## License
