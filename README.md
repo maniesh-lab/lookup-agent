@@ -79,7 +79,7 @@ docker compose up --build
 
 The first start builds the database (tables, fake shop data, policy search index) and downloads the search models, so it takes a few minutes. Then:
 
-- **Chat page:** open http://localhost:8000 and ask a question, or pick one of the suggestions. Each answer shows which sources were checked, in order, and the details underneath (the policy section, the SQL that ran, or the exchange rate). Light and dark mode follow your system, or switch with the button in the corner.
+- **Chat page:** open http://localhost:8000 and ask a question, or pick one of the suggestions. Each answer shows which sources were checked, in order, and the details underneath (the policy section, the SQL that ran, or the exchange rate). Press the stop button (or Esc) to cancel a question while it's being answered; the server stops working on it too. Light and dark mode follow your system, or switch with the button in the corner.
 - **API:** open http://localhost:8000/docs and try `POST /chat`:
 
 ```json

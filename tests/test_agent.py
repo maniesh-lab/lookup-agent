@@ -187,3 +187,67 @@ async def test_prompt_version_is_used(version):
     system = llm.calls[0]["messages"][0]["content"]
     assert ("Pick the right source" in system) == (version == "v2")
     assert result.prompt_version == version
+
+
+# --- Stopped turns -------------------------------------------------------------
+
+from app.agent.graph import repair_history  # noqa: E402
+
+
+def call(call_id, name="search_docs"):
+    return {"id": call_id, "type": "function", "function": {"name": name, "arguments": "{}"}}
+
+
+def test_repair_history_drops_unanswered_tool_calls():
+    history = [
+        {"role": "user", "content": "q1"},
+        {"role": "assistant", "content": None, "tool_calls": [call("a")]},
+        {"role": "tool", "tool_call_id": "a", "content": "result a"},
+        {"role": "assistant", "content": "answer 1"},
+        {"role": "user", "content": "q2"},
+        # stopped here: a tool request with no result
+        {"role": "assistant", "content": None, "tool_calls": [call("b")]},
+        {"role": "user", "content": "q3"},
+    ]
+    repaired = repair_history(history)
+    assert [m["role"] for m in repaired] == ["user", "assistant", "tool", "assistant", "user", "user"]
+    assert repaired[1]["tool_calls"] == [call("a")]
+
+
+def test_repair_history_keeps_text_and_drops_orphan_results():
+    history = [
+        {"role": "assistant", "content": "Let me check.", "tool_calls": [call("x")]},
+        {"role": "tool", "tool_call_id": "y", "content": "orphan"},
+        {"role": "user", "content": "q"},
+    ]
+    assert repair_history(history) == [
+        {"role": "assistant", "content": "Let me check."},
+        {"role": "user", "content": "q"},
+    ]
+
+
+async def test_conversation_continues_after_a_stopped_turn():
+    import asyncio
+    import time
+
+    def slow_search(query):
+        time.sleep(0.5)  # still running when the turn is stopped
+        return "{}"
+
+    registry = ToolRegistry([Tool("search_docs", "Search.", QueryArgs, slow_search, "document")])
+    llm = FakeLLM([tool_reply("search_docs", {"query": "x"}, "c1"), text_reply("Second answer.")])
+    agent = make_agent(llm, registry)
+
+    thread = "stop-me"
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(agent.ask("first question", thread_id=thread), timeout=0.2)
+
+    saved = (await agent.graph.aget_state({"configurable": {"thread_id": thread}})).values["messages"]
+    assert saved[-1].get("tool_calls")  # the stop left a request with no result in memory
+
+    result = await agent.ask("second question", thread_id=thread)
+
+    assert result.answer == "Second answer."
+    sent = llm.calls[-1]["messages"]
+    assert not any(m.get("tool_calls") for m in sent)  # the unanswered request was dropped
+    assert [m["content"] for m in sent if m["role"] == "user"] == ["first question", "second question"]

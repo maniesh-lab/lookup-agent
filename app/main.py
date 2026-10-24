@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import secrets
 import time
 import uuid
@@ -7,7 +8,7 @@ from pathlib import Path
 
 import structlog
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 from steadfast import SteadfastError
 
@@ -51,27 +52,54 @@ app = FastAPI(
 )
 
 
-@app.middleware("http")
-async def correlation_id_middleware(request: Request, call_next):
-    """Give every request an id, put it on every log line, and return it in a header."""
-    correlation_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
-    structlog.contextvars.clear_contextvars()
-    structlog.contextvars.bind_contextvars(correlation_id=correlation_id)
-    start = time.perf_counter()
-    try:
-        response = await call_next(request)
-    except Exception:
-        log.exception("request_failed", method=request.method, path=request.url.path)
-        raise
-    response.headers["X-Request-ID"] = correlation_id
-    log.info(
-        "request",
-        method=request.method,
-        path=request.url.path,
-        status=response.status_code,
-        duration_ms=round((time.perf_counter() - start) * 1000, 1),
-    )
-    return response
+class CorrelationIdMiddleware:
+    """Give every request an id, put it on every log line, and return it in a header.
+
+    Written as plain ASGI (not @app.middleware("http")) on purpose: that
+    shortcut hides client disconnects from the endpoint, and /chat needs to
+    see them to cancel work when the user presses Stop.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        headers = dict(scope.get("headers") or [])
+        correlation_id = headers.get(b"x-request-id", b"").decode() or str(uuid.uuid4())
+        structlog.contextvars.clear_contextvars()
+        structlog.contextvars.bind_contextvars(correlation_id=correlation_id)
+        start = time.perf_counter()
+        status = 500
+
+        async def send_with_id(message):
+            nonlocal status
+            if message["type"] == "http.response.start":
+                status = message["status"]
+                message = {
+                    **message,
+                    "headers": [*message.get("headers", []), (b"x-request-id", correlation_id.encode())],
+                }
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_with_id)
+        except Exception:
+            log.exception("request_failed", method=scope["method"], path=scope["path"])
+            raise
+        log.info(
+            "request",
+            method=scope["method"],
+            path=scope["path"],
+            status=status,
+            duration_ms=round((time.perf_counter() - start) * 1000, 1),
+        )
+
+
+app.add_middleware(CorrelationIdMiddleware)
 
 
 def get_agent(request: Request) -> Agent:
@@ -118,11 +146,36 @@ class ChatResponse(BaseModel):
     prompt_version: str
 
 
-@app.post("/chat", response_model=ChatResponse, response_model_exclude_none=True)
-async def chat(body: ChatRequest, agent: Agent = Depends(get_agent)):
+# How often /chat checks whether the caller has gone away (pressed Stop, closed the tab).
+DISCONNECT_CHECK_SECONDS = 0.5
+CLIENT_CLOSED_REQUEST = 499  # nginx's status for "the client hung up first"
+
+
+@app.post(
+    "/chat",
+    response_model=ChatResponse,
+    response_model_exclude_none=True,
+    responses={
+        CLIENT_CLOSED_REQUEST: {"description": "The caller stopped waiting; the answer was cancelled."}
+    },
+)
+async def chat(body: ChatRequest, request: Request, agent: Agent = Depends(get_agent)):
     correlation_id = structlog.contextvars.get_contextvars().get("correlation_id")
+    task = asyncio.create_task(
+        agent.ask(body.message, thread_id=body.thread_id, correlation_id=correlation_id)
+    )
+    # While the agent works, keep checking that someone is still waiting for the
+    # answer. If not, cancel it so no more LLM calls (and tokens) are spent.
+    while not task.done():
+        await asyncio.wait({task}, timeout=DISCONNECT_CHECK_SECONDS)
+        if not task.done() and await request.is_disconnected():
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+            log.info("chat_cancelled", thread_id=body.thread_id)
+            return Response(status_code=CLIENT_CLOSED_REQUEST)
     try:
-        result = await agent.ask(body.message, thread_id=body.thread_id, correlation_id=correlation_id)
+        result = task.result()
     except SteadfastError as exc:
         # Steadfast already retried (and tried the fallback provider) before giving up.
         log.error("llm_unavailable", error=str(exc))

@@ -125,3 +125,34 @@ def test_chat_returns_503_when_the_llm_is_down(client):
         main.app.dependency_overrides.clear()
     assert response.status_code == 503
     assert "unavailable" in response.json()["detail"]
+
+
+async def test_chat_is_cancelled_when_the_caller_hangs_up(monkeypatch):
+    import asyncio
+
+    from app.main import ChatRequest, chat
+
+    cancelled = asyncio.Event()
+
+    class SlowAgent:
+        async def ask(self, *args, **kwargs):
+            try:
+                await asyncio.sleep(10)
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
+
+    class GoneRequest:
+        async def is_disconnected(self):
+            return True
+
+    monkeypatch.setattr(main, "DISCONNECT_CHECK_SECONDS", 0.01)
+    response = await chat(ChatRequest(message="hi"), GoneRequest(), SlowAgent())
+
+    assert response.status_code == 499
+    assert cancelled.is_set()
+
+
+def test_chat_page_has_a_stop_button(client):
+    page = client.get("/").text
+    assert "AbortController" in page and 'id="i-stop"' in page

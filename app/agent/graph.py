@@ -38,6 +38,35 @@ STEP_LIMIT_NOTE = (
 )
 
 
+def repair_history(messages: list[dict]) -> list[dict]:
+    """Drop half-finished tool steps before sending the conversation to the LLM.
+
+    If a turn is stopped partway (the user pressed Stop, the server restarted,
+    a provider timed out), the saved conversation can end up with a tool
+    request that never got its result, or a result whose request is gone.
+    Providers reject a conversation like that, so every later question in
+    the thread would fail. This keeps only complete request/result pairs.
+    The saved history itself is left as it is; only what is sent is cleaned.
+    """
+    answered = {m.get("tool_call_id") for m in messages if m.get("role") == "tool"}
+    repaired: list[dict] = []
+    kept_calls: set[str] = set()
+    for message in messages:
+        if message.get("role") == "assistant" and message.get("tool_calls"):
+            calls = [c for c in message["tool_calls"] if c.get("id") in answered]
+            kept_calls.update(c["id"] for c in calls)
+            if calls:
+                repaired.append({**message, "tool_calls": calls})
+            elif message.get("content"):
+                repaired.append({"role": "assistant", "content": message["content"]})
+        elif message.get("role") == "tool":
+            if message.get("tool_call_id") in kept_calls:
+                repaired.append(message)
+        else:
+            repaired.append(message)
+    return repaired
+
+
 class AgentState(TypedDict):
     # operator.add means "append": each node returns only its new messages.
     messages: Annotated[list[dict], operator.add]
@@ -57,7 +86,8 @@ def build_graph(
 
     async def agent_node(state: AgentState) -> dict:
         steps = state.get("steps", 0)
-        messages = [{"role": "system", "content": load_prompt(prompt_version)}, *state["messages"]]
+        history = repair_history(state["messages"])
+        messages = [{"role": "system", "content": load_prompt(prompt_version)}, *history]
 
         if steps >= max_steps:
             messages.append({"role": "user", "content": STEP_LIMIT_NOTE})

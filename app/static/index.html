@@ -266,6 +266,7 @@
       font-size: 0.92rem;
     }
     .error button { margin-top: 8px; }
+    .stopped { color: var(--ink-faint); font-size: 0.88rem; padding: 2px 4px; }
 
     /* Composer */
     footer { padding: 10px 0 16px; }
@@ -297,6 +298,8 @@
       cursor: pointer;
     }
     .send:disabled { opacity: 0.35; cursor: not-allowed; }
+    .send.stop { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); }
+    .send.stop:hover { border-color: var(--ink-faint); }
     .send svg { width: 18px; height: 18px; }
     .hint { color: var(--ink-faint); font-size: 0.76rem; margin: 6px 4px 0; }
 
@@ -321,6 +324,7 @@
     <symbol id="i-db" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.5" rx="7" ry="2.5"/><path d="M5 5.5v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6M5 11.5v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6"/></symbol>
     <symbol id="i-rate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13l-3-3M20 16H7l3 3"/></symbol>
     <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor"/></symbol>
     <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
     <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
     <symbol id="i-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></symbol>
@@ -367,10 +371,10 @@
         <label for="input" class="sr-only">Your question</label>
         <textarea id="input" rows="1" maxlength="2000" placeholder="Ask a question…" autocomplete="off"></textarea>
         <button class="send" id="send" type="submit" disabled aria-label="Send question">
-          <svg aria-hidden="true"><use href="#i-send"/></svg>
+          <svg aria-hidden="true"><use id="sendIcon" href="#i-send"/></svg>
         </button>
       </form>
-      <p class="hint">Enter to send, Shift + Enter for a new line. Demo shop data covers January to June 2026.</p>
+      <p class="hint">Enter to send, Shift + Enter for a new line, Esc to stop. Demo shop data covers January to June 2026.</p>
     </footer>
   </div>
 
@@ -387,6 +391,8 @@
 
     let threadId = null;
     let busy = false;
+    let controller = null;  // lets Stop cancel the request that is running
+    let quietStop = false;  // true when "New conversation" stops a request: no "Stopped." note then
 
     // ---------- Theme: system -> light -> dark ----------
     const THEMES = ["system", "light", "dark"];
@@ -537,11 +543,13 @@
       welcome.hidden = true;
       if (echo) addUserMessage(text);
       const thinking = showThinking();
+      controller = new AbortController();
       try {
         const res = await fetch("/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: text, thread_id: threadId }),
+          signal: controller.signal,
         });
         let body = null;
         try { body = await res.json(); } catch { /* not JSON */ }
@@ -549,10 +557,13 @@
         if (!res.ok) { addError(errorMessage(res.status, body), text); return; }
         threadId = body.thread_id;
         addAnswer(body);
-      } catch {
+      } catch (err) {
         thinking.remove();
-        addError("Couldn't reach the server. Check that lookup-agent is running, then try again.", text);
+        if (err.name === "AbortError") { if (!quietStop) addStopped(text); }
+        else addError("Couldn't reach the server. Check that lookup-agent is running, then try again.", text);
       } finally {
+        controller = null;
+        quietStop = false;
         busy = false;
         log.setAttribute("aria-busy", "false");
         updateSend();
@@ -560,14 +571,47 @@
       }
     }
 
+    // Stop: the page stops waiting, and the server notices and cancels the answer.
+    function stop({ quiet = false } = {}) {
+      if (!controller) return;
+      quietStop = quiet;
+      controller.abort();
+    }
+
+    function addStopped(text) {
+      log.append(el("div", { class: "msg bot" }, el("p", { class: "stopped", role: "status", text: "Stopped." })));
+      if (!input.value.trim()) {  // give the question back so it can be edited and sent again
+        input.value = text;
+        autoGrow();
+      }
+      scrollDown();
+    }
+
     // ---------- Composer ----------
-    function updateSend() { sendBtn.disabled = busy || !input.value.trim(); }
+    function updateSend() {
+      const sendIcon = document.getElementById("sendIcon");
+      if (busy) {
+        sendBtn.type = "button";
+        sendBtn.disabled = false;
+        sendBtn.classList.add("stop");
+        sendBtn.setAttribute("aria-label", "Stop answering");
+        sendIcon.setAttribute("href", "#i-stop");
+      } else {
+        sendBtn.type = "submit";
+        sendBtn.disabled = !input.value.trim();
+        sendBtn.classList.remove("stop");
+        sendBtn.setAttribute("aria-label", "Send question");
+        sendIcon.setAttribute("href", "#i-send");
+      }
+    }
     function autoGrow() { input.style.height = "auto"; input.style.height = `${Math.min(input.scrollHeight, 160)}px`; }
 
     input.addEventListener("input", () => { autoGrow(); updateSend(); });
     input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (!busy) form.requestSubmit(); }
     });
+    sendBtn.addEventListener("click", (e) => { if (busy) { e.preventDefault(); stop(); } });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && busy) stop(); });
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       const text = input.value.trim();
@@ -580,7 +624,7 @@
       btn.addEventListener("click", () => ask(btn.lastChild.textContent.trim()));
     }
     document.getElementById("newChat").addEventListener("click", () => {
-      if (busy) return;
+      stop({ quiet: true });
       threadId = null;
       for (const node of [...log.children]) if (node !== welcome) node.remove();
       welcome.hidden = false;

@@ -44,8 +44,9 @@ flowchart LR
 2. **The agent node** sends the system prompt (`app/agent/prompts/v2.txt`), the conversation so far and the three tool descriptions to the LLM through **Steadfast**.
 3. If the model asks for tools, **the tools node** runs each one (in a thread, so the server isn't blocked) and adds the results to the conversation. Bad arguments, SQL errors and API failures come back to the model as short error messages it can act on, never as crashes.
 4. Steps 2 and 3 repeat until the model answers in plain text. A **step cap** (`MAX_AGENT_STEPS`, default 6) stops a loop: at the cap, tools are switched off and the model is told to answer with what it has.
-5. The **checkpointer** saves the conversation in Postgres under its `thread_id`, so sending the same `thread_id` again continues the conversation, even after a restart.
-6. The runner collects the answer, which tools were used, and a **sources** list built from the tool results (policy file and section, the SQL that ran, the exchange rate and its date).
+5. If the caller hangs up while the agent is working (the chat page's Stop button, or a closed tab), `/chat` notices within half a second and cancels the run, so no more LLM calls are made. Before every LLM call, unfinished tool steps left by a stopped run are dropped from what is sent, so the conversation can carry on.
+6. The **checkpointer** saves the conversation in Postgres under its `thread_id`, so sending the same `thread_id` again continues the conversation, even after a restart.
+7. The runner collects the answer, which tools were used, and a **sources** list built from the tool results (policy file and section, the SQL that ran, the exchange rate and its date).
 
 ## The pieces
 

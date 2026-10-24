@@ -36,6 +36,8 @@ First full version.
 
 ### Added (chat page)
 - A chat page at `/` (`app/static/index.html`): suggested questions, conversation memory, a "checked" trail showing which sources each answer used, sources with the SQL, light and dark mode, works on mobile.
+- A stop button (and Esc) on the chat page. `/chat` cancels the agent when the caller hangs up (returns 499), and unfinished tool steps from a stopped run are dropped before the next LLM call, so the conversation keeps working.
+- The request-id middleware is now plain ASGI, so endpoints can see client disconnects.
 
 ### Changed
 - Coverage is uploaded to Codecov on every push; the README badge shows it.
