@@ -29,8 +29,8 @@ First full version.
 - First measured results in the README.
 
 ### Changed
+- Coverage is uploaded to Codecov on every push; the README badge shows it.
 - Steadfast now installs from PyPI (`steadfast-llm` 0.3.0) instead of from GitHub, so the Docker image no longer needs git.
 
 ### Not done yet
-- Codecov token for the coverage badge
 - Full `docker compose up --build` check, live deploy or demo GIF
