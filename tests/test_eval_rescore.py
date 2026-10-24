@@ -50,7 +50,7 @@ def old_record(case_id, category, answer, tools, sources_ok=True):
 
 def test_rescore_fixes_lookalike_failures(tmp_path, monkeypatch):
     monkeypatch.setattr(rescore, "Truth", FakeTruth)
-    monkeypatch.setattr(rescore, "load_cases", lambda ids: CASES)
+    monkeypatch.setattr(rescore, "load_cases", lambda ids, eval_set="main": CASES)
     monkeypatch.setattr(rescore, "RESULTS", tmp_path)
     import eval.run_eval as run_eval
 

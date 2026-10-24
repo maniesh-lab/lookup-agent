@@ -132,14 +132,16 @@ The model writes its own SQL, so it runs inside four layers: only single `SELECT
 |---|---|
 | `eval/questions.txt` | The first 25 draft questions, one per line with their type |
 | `eval/test_set.json` | The full set of 41 questions with the checks for each one (the drafts are q01 to q25) |
+| `eval/hard_set.json` | 15 harder questions (traps, safety, follow-ups, half-answerable, reasoning), added after both prompts scored 41/41 |
 | `eval/retrieval_set.json` | 26 search queries with the policy file each should find |
-| `eval/results/` | Saved runs; `summary.md` keeps one line per run |
+| `eval/results/` | Saved runs; `summary.md` and `summary-hard.md` keep one line per run |
 | `eval/rescore.py` | Re-scores a saved run after the scoring rules change, without new AI calls |
 
 ```bash
 python -m eval.run_retrieval_eval            # search hit rate per layer
 python -m eval.run_eval --prompt v1          # full agent eval with prompt v1
 python -m eval.run_eval --prompt v2 --delay 3   # pause between questions if you hit rate limits
+python -m eval.run_eval --prompt v2 --set hard  # the harder set
 python -m eval.rescore eval/results/v2-<time>.json   # score a saved run again
 ```
 

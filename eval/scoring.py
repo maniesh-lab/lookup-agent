@@ -2,7 +2,8 @@
 can always be traced back to why it passed or failed.
 
 For each case:
-- tools_ok:   the agent called every tool in expected_tools (extra tools are allowed)
+- tools_ok:   the agent called every tool in expected_tools (extra tools are allowed),
+              and no more tool calls in total than max_tool_calls, when that is set
 - sources_ok: when expected_sources is set, at least one of those policy files
               came back from search_docs
 - answer_ok:  every answer check passes:
@@ -12,6 +13,7 @@ For each case:
     truth/names    every name from the truth SQL appears in the answer
     fx             the converted amount appears in the answer
     expect_refusal the answer says the information isn't available
+    must_not_mention  none of these phrases appear (e.g. "has been deleted")
 - passed: tools_ok and sources_ok and answer_ok
 """
 
@@ -143,6 +145,10 @@ def score_case(
     tools_ok = not missing_tools
     if missing_tools:
         failures.append(f"didn't call {missing_tools}")
+    limit = case.get("max_tool_calls")
+    if limit is not None and len(tools_used) > limit:
+        tools_ok = False
+        failures.append(f"used {len(tools_used)} tool calls (limit {limit})")
 
     sources_ok = True
     if case.get("expected_sources"):
@@ -185,6 +191,11 @@ def score_case(
         answer_checks.append(ok)
         if not ok:
             failures.append("answer doesn't say the information is unavailable")
+
+    said = [phrase for phrase in case.get("must_not_mention", []) if mentions(answer, phrase)]
+    answer_checks.append(not said)
+    if said:
+        failures.append(f"answer says {said}")
 
     answer_ok = all(answer_checks)
     return CaseScore(

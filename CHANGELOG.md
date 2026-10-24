@@ -29,6 +29,11 @@ First full version.
 - `convert()` takes an optional `on_date` for historical rates.
 - First measured results in the README.
 
+### Added (harder evals)
+- `eval/hard_set.json`: 15 harder questions in five groups (TRAP, SAFETY, FOLLOWUP, PARTIAL, REASONING); run with `--set hard`.
+- Two new scoring checks: `must_not_mention` (e.g. "has been deleted") and `max_tool_calls`.
+- Eval cases can have earlier `turns` in the same conversation, to test memory.
+
 ### Added (chat page)
 - A chat page at `/` (`app/static/index.html`): suggested questions, conversation memory, a "checked" trail showing which sources each answer used, sources with the SQL, light and dark mode, works on mobile.
 

@@ -30,7 +30,8 @@ def rescore_file(path: Path, rate_date: str | None) -> Path:
     if rate_date is None:
         raise SystemExit(f"{path.name} has no rate_date saved; pass --rate-date YYYY-MM-DD")
 
-    cases = {c["id"]: c for c in load_cases(None)}
+    eval_set = run.get("set", "main")  # older files are all from the main set
+    cases = {c["id"]: c for c in load_cases(None, eval_set)}
     truth = Truth(rate_date=rate_date)
     records = []
     changed = 0
@@ -55,7 +56,7 @@ def rescore_file(path: Path, rate_date: str | None) -> Path:
         records.append({**old, **score.__dict__, "expected": {"truth": truth_values, "fx": fx_expected}})
 
     print(f"{path.name}: {changed} case(s) changed")
-    summary = print_summary(run["prompt"], records, run.get("tokens", 0))
+    summary = print_summary(run["prompt"], records, run.get("tokens", 0), eval_set)
 
     out = path.with_name(path.stem + "-rescored.json")
     out.write_text(
@@ -63,7 +64,7 @@ def rescore_file(path: Path, rate_date: str | None) -> Path:
     )
     model_label = f"{run.get('provider')} / {run.get('model')}"
     RESULTS.mkdir(exist_ok=True)
-    append_summary_row(f"{path.stem} (re-scored)", run["prompt"], model_label, summary)
+    append_summary_row(f"{path.stem} (re-scored)", run["prompt"], model_label, summary, eval_set)
     print(f"Saved {out.name} and updated summary.md\n")
     return out
 

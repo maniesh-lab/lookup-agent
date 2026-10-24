@@ -247,3 +247,31 @@ async def test_agent_end_to_end_with_real_tools(seeded_db, ingested, monkeypatch
         await agent.ask("What did I just ask?", thread_id=result.thread_id)
     remembered = [m.get("content") for m in llm.calls[-1]["messages"]]
     assert any("March orders" in (c or "") for c in remembered)
+
+
+@pytest.mark.parametrize("eval_set", ["main", "hard"])
+def test_every_truth_query_runs(db, eval_set):
+    """Each eval case's truth SQL must run on the seeded data and return a value."""
+    from eval.run_eval import load_cases
+
+    for case in load_cases(None, eval_set):
+        for truth in case.get("truth", []):
+            with db.cursor() as cur:
+                cur.execute(truth["sql"])
+                rows = cur.fetchall()
+            assert rows and rows[0][0] is not None, case["id"]
+
+
+def test_hard_set_traps_really_have_no_data(db):
+    """The trap questions only work if the data they ask about doesn't exist."""
+    assert one(db, "SELECT count(*) FROM customers WHERE full_name ILIKE %s", "%montoya%")[0] == 0
+    assert (
+        one(
+            db,
+            "SELECT count(*) FROM orders o JOIN customers c ON c.id = o.customer_id"
+            " WHERE c.full_name = 'Priya Sharma' AND o.order_date = '2026-03-03'",
+        )[0]
+        == 0
+    )
+    assert one(db, "SELECT count(*) FROM orders WHERE order_date >= '2026-08-01'")[0] == 0
+    assert one(db, "SELECT count(*) FROM products WHERE category ILIKE %s", "%toy%")[0] == 0
