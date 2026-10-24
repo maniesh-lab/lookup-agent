@@ -162,6 +162,14 @@ python -m eval.run_eval --prompt v2 --set hard  # the harder set
 python -m eval.rescore eval/results/v2-<time>.json   # score a saved run again
 ```
 
+## Tracing
+
+With a free [Langfuse](https://langfuse.com) account, set `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` and `LANGFUSE_HOST` in `.env`. Every chat turn then becomes a trace: each LLM call (with its token count) and each tool call is a step inside it, with its input, output and time, and the trace is tagged with the prompt version. Without the keys, tracing is off and nothing else changes.
+
+![A Langfuse trace of one question: an LLM call, a search_docs call, then the LLM call that writes the answer](docs/images/langfuse-trace.png)
+
+In this trace the document search took 7.8 s of the 9.1 s total, while both LLM calls took under a second, so search is the step to speed up first.
+
 ## Tests
 
 ```bash

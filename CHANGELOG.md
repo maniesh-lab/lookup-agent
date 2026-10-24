@@ -39,6 +39,7 @@ First full version.
 - Scorer: more "not found" wordings accepted for h01 and h15; h15 no longer requires a database query, because the category list is in the tool description.
 - Prompt v2 gained a rule: for "most / least / top" questions, check for ties instead of using `LIMIT 1` (both prompts missed a three-way tie on h10). Not measured yet.
 - `eval/rescore.py` prints the right summary file name for the hard set.
+- Langfuse tracing checked with a real account: each chat turn shows its LLM and tool steps with timings and the prompt version. Screenshot in the README.
 
 ### Added (chat page)
 - A chat page at `/` (`app/static/index.html`): suggested questions, conversation memory, a "checked" trail showing which sources each answer used, sources with the SQL, light and dark mode, works on mobile.
