@@ -2,7 +2,7 @@
 --
 -- Safe to run again: it drops and recreates every table, so running it
 -- wipes the data. Load it with:
---     python scripts/setup_db.py
+--     python -m scripts.setup_db
 -- or by hand:
 --     docker compose exec -T postgres psql -U postgres -d lookup_db < db/schema.sql
 

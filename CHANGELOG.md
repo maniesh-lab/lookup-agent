@@ -21,6 +21,7 @@ First full version.
 ### Fixed (after the first real eval run, 2026-10-24)
 - The scorer failed correct answers that used lookalike characters (non-breaking hyphens, narrow no-break spaces inside names and as thousands separators). Text is now normalized before every check.
 - Refusal detection now also accepts "doesn't record" / "don't keep track" wording.
+- `/chat` replies leave out empty source fields instead of sending them as `null`.
 
 ### Added (after the first real eval run)
 - `eval/rescore.py`: score a saved run again without new AI calls, using the exchange rates of the run's day.

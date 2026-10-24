@@ -7,7 +7,7 @@
   only used on the top results.
 
 Both come from sentence-transformers and are downloaded the first time
-they are used (about 100 MB together). Tests swap in fakes, so the test
+they are used (about 220 MB together). Tests swap in fakes, so the test
 suite never downloads them.
 """
 

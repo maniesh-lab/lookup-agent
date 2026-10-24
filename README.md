@@ -87,6 +87,8 @@ The reply has `answer`, `sources`, `tools_used` and a `thread_id`. Send the `thr
 
 ## Run it without Docker (for development)
 
+Needs Python 3.11 or newer.
+
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install torch --index-url https://download.pytorch.org/whl/cpu   # CPU-only build, much smaller
@@ -145,7 +147,7 @@ TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/lookup_test pyte
 ruff check .
 ```
 
-The integration tests rebuild the tables in the database you point them at, so use a separate one. CI runs lint and both test groups against a real pgvector Postgres on every push.
+The integration tests rebuild the tables in the database you point them at, so use a separate one. Create it once with `docker compose exec postgres createdb -U postgres lookup_test`. CI runs lint and both test groups against a real pgvector Postgres on every push.
 
 ## Project structure
 
@@ -168,7 +170,7 @@ CHANGELOG.md           what was built and changed
 
 ## Settings
 
-All settings come from `.env` (see `.env.example`). The main ones: `LLM_PROVIDER` (`groq` or `openai`, the other one becomes the fallback when its key is set), `LLM_MODEL`, `PROMPT_VERSION`, `MAX_AGENT_STEPS`, `SEARCH_MODE` (`vector`, `hybrid` or `rerank`), and the optional Langfuse keys for tracing.
+All settings come from `.env` (see `.env.example`). The main ones: `LLM_PROVIDER` (`groq` or `openai`, the other one becomes the fallback when its key is set), `LLM_MODEL`, `PROMPT_VERSION`, `MAX_AGENT_STEPS`, `SEARCH_MODE` (`vector`, `hybrid` or `rerank`), and the optional Langfuse keys for tracing. Less common settings (SQL timeout and row limit, search models, rate limit, temperature) have defaults in `app/core/config.py` and can be overridden the same way.
 
 ## Known limitations
 

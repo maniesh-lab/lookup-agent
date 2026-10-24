@@ -23,7 +23,8 @@ from app.core.config import settings
 from app.db import connect_readonly
 
 SCHEMA_GUIDE = """\
-Tables (PostgreSQL). All money is in USD. Data covers 2026-01-01 to 2026-06-30.
+Tables (PostgreSQL). All money is in USD. Orders and tickets cover 2026-01-01 to 2026-06-30;
+customers signed up from 2025-07-01 on.
 - customers(id, full_name, email, city, country, plan, signup_date)
     plan: 'basic' or 'premium'
 - products(id, name, category, price)

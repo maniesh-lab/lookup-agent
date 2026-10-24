@@ -42,7 +42,9 @@ jobs:
           pip install -r requirements.txt
 
       - name: Lint
-        run: ruff check .
+        run: |
+          ruff check .
+          ruff format --check .
 
       - name: Tests (unit + integration, mocked LLM)
         run: pytest --cov --cov-report=xml --cov-report=term
