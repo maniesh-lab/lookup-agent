@@ -62,7 +62,11 @@ def test_chat(client, agent):
     body = response.json()
     assert body["answer"] == "You have 30 days."
     assert body["thread_id"] == "new-thread"
-    assert body["sources"][0]["name"] == "returns.md"
+    assert body["sources"][0] == {
+        "type": "document",
+        "name": "returns.md",
+        "section": "Returns Policy > Return window",
+    }  # empty fields (query, detail) are left out, not sent as null
     assert body["tools_used"] == ["search_docs"]
     # The request's correlation id reaches the agent (and from there the traces).
     assert agent.asked == [("what's your return window?", None, "req-1")]

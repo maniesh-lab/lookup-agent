@@ -108,7 +108,7 @@ class ChatResponse(BaseModel):
     prompt_version: str
 
 
-@app.post("/chat", response_model=ChatResponse)
+@app.post("/chat", response_model=ChatResponse, response_model_exclude_none=True)
 async def chat(body: ChatRequest, agent: Agent = Depends(get_agent)):
     correlation_id = structlog.contextvars.get_contextvars().get("correlation_id")
     try:
