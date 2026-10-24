@@ -1,0 +1,46 @@
+{
+  "set": "hard",
+  "prompt": "v2",
+  "model": "openai/gpt-oss-120b",
+  "provider": "groq",
+  "tokens": 2984,
+  "rate_date": null,
+  "records": [
+    {
+      "id": "h10",
+      "category": "REASONING",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "Which single product sold the most units between April 1 and June 30, 2026, not counting cancelled orders?",
+      "answer": "The highest\u2011selling products (by units) between\u202f2026\u201104\u201101 and\u202f2026\u201106\u201130, excluding cancelled orders, are three items that each sold **25 units**:\n\n- **Orbit USB\u2011C Hub**\n- **Bamboo Cutting Board**\n- **Swift Wireless Mouse**\n\nThese three products are tied for the most units sold in that period.  \n\n**Sources:** shop database.",
+      "tools_used": [
+        "query_database"
+      ],
+      "sources": [
+        {
+          "type": "database",
+          "name": "shop database",
+          "query": "SELECT p.id, p.name, SUM(oi.quantity) AS total_units\nFROM orders o\nJOIN order_items oi ON o.id = oi.order_id\nJOIN products p ON oi.product_id = p.id\nWHERE o.order_date BETWEEN '2026-04-01' AND '2026-06-30'\n  AND o.status <> 'cancelled'\nGROUP BY p.id, p.name\nORDER BY total_units DESC\nLIMIT 5;"
+        }
+      ],
+      "expected": {
+        "truth": [
+          {
+            "check": "names",
+            "values": [
+              "Swift Wireless Mouse",
+              "Orbit USB-C Hub",
+              "Bamboo Cutting Board"
+            ],
+            "expected_number": null
+          }
+        ],
+        "fx": null
+      },
+      "seconds": 1.96
+    }
+  ]
+}
