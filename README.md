@@ -64,6 +64,8 @@ How to read this:
 - **Search is saturated too.** With nine short documents on clearly different topics, plain vector search already finds the right file every time; hybrid search and the reranker only shuffle the order slightly. They would matter on a bigger or messier document set.
 - **Small sample**: one run per prompt, one model.
 
+Every answer from both runs, with its score, is saved in [`eval/results/`](eval/results/) (`summary.md` lists the runs).
+
 ## Quick start (Docker)
 
 You need Docker and a free [Groq API key](https://console.groq.com).
@@ -157,10 +159,11 @@ app/
   core/                settings, JSON logging, Langfuse tracing
 db/                    schema.sql, seed.py (repeatable fake shop data)
 data/policies/         the nine policy documents
-eval/                  test set, scorer, eval runners, results
+eval/                  test set, scorer, eval runners, re-scorer, results
 scripts/               setup_db, ingest_docs, ask, try_tools
 tests/                 unit tests and integration tests
 docs/architecture.md   design and diagram
+CHANGELOG.md           what was built and changed
 ```
 
 ## Settings
