@@ -42,16 +42,21 @@ def load_cases(ids: list[str] | None) -> list[dict]:
 class Truth:
     """Expected values, computed at run time from the database and the live API."""
 
-    def __init__(self):
+    def __init__(self, rate_date: str | None = None):
+        """rate_date: use that day's exchange rates (for re-scoring an old run);
+        None means the latest rates, like the agent itself uses."""
         self.conn = connect()
+        self.requested_date = rate_date
+        self.rate_date: str | None = None  # the date of the rates actually used
         self.rates: dict[tuple[str, str], float] = {}
 
     def rate(self, src: str, dst: str) -> float:
         if (src, dst) not in self.rates:
-            result = convert(1, src, dst)
+            result = convert(1, src, dst, on_date=self.requested_date)
             if "error" in result:
                 raise RuntimeError(f"Currency API failed while scoring: {result['error']}")
             self.rates[(src, dst)] = result["rate"]
+            self.rate_date = self.rate_date or result.get("rate_date")
         return self.rates[(src, dst)]
 
     def for_case(self, case: dict) -> tuple[list[dict], float | None]:
@@ -61,7 +66,11 @@ class Truth:
                 cur.execute(truth["sql"])
                 rows = cur.fetchall()
             first_column = [r[0] for r in rows]
-            entry = {"check": truth["check"], "values": first_column, "expected_number": None}
+            entry = {
+                "check": truth["check"],
+                "values": [_plain(v) for v in first_column],
+                "expected_number": None,
+            }
             if truth["check"] == "number" and first_column and first_column[0] is not None:
                 number = float(first_column[0])
                 if truth.get("convert_to"):
@@ -110,13 +119,25 @@ async def run(prompt: str, ids: list[str] | None, delay: float) -> None:
                 "question": case["question"],
                 "answer": answer,
                 "tools_used": tools,
+                "sources": sources,
+                "expected": {"truth": truth_values, "fx": fx_expected},
                 "seconds": seconds,
             }
         )
         if delay and i < len(cases):
             await asyncio.sleep(delay)
 
-    write_report(prompt, records, _total_tokens(agent) - start_tokens)
+    write_report(prompt, records, _total_tokens(agent) - start_tokens, rate_date=truth.rate_date)
+
+
+def _plain(value):
+    """Database values as JSON-friendly numbers or text."""
+    if isinstance(value, (int, float, str)) or value is None:
+        return value
+    try:
+        return float(value)  # Decimal
+    except (TypeError, ValueError):
+        return str(value)  # dates
 
 
 def _total_tokens(agent) -> int:
@@ -125,52 +146,59 @@ def _total_tokens(agent) -> int:
     return client.total_usage.total_tokens if client else 0
 
 
-def write_report(prompt: str, records: list[dict], tokens: int) -> None:
-    model = settings.llm_model if settings.llm_provider == "groq" else settings.openai_model
+CATEGORIES = ["DOCS", "DB", "API", "MIXED", "NONE"]
+
+
+def pct(values) -> str:
+    return f"{100 * sum(values) / len(values):.0f}% ({sum(values)}/{len(values)})" if values else "-"
+
+
+def print_summary(prompt: str, records: list[dict], tokens: int) -> dict:
     by_cat = defaultdict(list)
     for r in records:
         by_cat[r["category"]].append(r["passed"])
-
-    def pct(values) -> str:
-        return f"{100 * sum(values) / len(values):.0f}% ({sum(values)}/{len(values)})" if values else "-"
-
-    overall = pct([r["passed"] for r in records])
-    tools = pct([r["tools_ok"] for r in records])
-    print(f"\nPrompt {prompt}: overall {overall}, tool choice {tools}, tokens {tokens}")
-    for cat in ["DOCS", "DB", "API", "MIXED", "NONE"]:
+    summary = {
+        "overall": pct([r["passed"] for r in records]),
+        "tools": pct([r["tools_ok"] for r in records]),
+        **{cat: pct(by_cat.get(cat, [])) for cat in CATEGORIES},
+    }
+    print(f"\nPrompt {prompt}: overall {summary['overall']}, tool choice {summary['tools']}, tokens {tokens}")
+    for cat in CATEGORIES:
         if cat in by_cat:
-            print(f"  {cat:<6} {pct(by_cat[cat])}")
+            print(f"  {cat:<6} {summary[cat]}")
+    return summary
+
+
+def append_summary_row(label: str, prompt: str, model_label: str, summary: dict) -> None:
+    path = RESULTS / "summary.md"
+    if not path.exists():
+        path.write_text(
+            "| run | prompt | provider / model | overall | tool choice | DOCS | DB | API "
+            "| MIXED | NONE |\n|---|---|---|---|---|---|---|---|---|---|\n"
+        )
+    row = [label, prompt, model_label, summary["overall"], summary["tools"]]
+    row += [summary[cat] for cat in CATEGORIES]
+    with path.open("a") as f:
+        f.write("| " + " | ".join(row) + " |\n")
+
+
+def write_report(prompt: str, records: list[dict], tokens: int, rate_date: str | None = None) -> None:
+    model = settings.llm_model if settings.llm_provider == "groq" else settings.openai_model
+    summary = print_summary(prompt, records, tokens)
 
     RESULTS.mkdir(exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     out = RESULTS / f"{prompt}-{stamp}.json"
-    out.write_text(
-        json.dumps(
-            {
-                "prompt": prompt,
-                "model": model,
-                "provider": settings.llm_provider,
-                "tokens": tokens,
-                "records": records,
-            },
-            indent=2,
-        )
-    )
-    summary = RESULTS / "summary.md"
-    if not summary.exists():
-        summary.write_text(
-            "| run | prompt | provider / model | overall | tool choice | DOCS | DB | API "
-            "| MIXED | NONE |\n|---|---|---|---|---|---|---|---|---|---|\n"
-        )
-    row = [
-        stamp,
-        prompt,
-        f"{settings.llm_provider} / {model}",
-        overall,
-        tools,
-    ] + [pct(by_cat.get(c, [])) for c in ["DOCS", "DB", "API", "MIXED", "NONE"]]
-    with summary.open("a") as f:
-        f.write("| " + " | ".join(row) + " |\n")
+    report = {
+        "prompt": prompt,
+        "model": model,
+        "provider": settings.llm_provider,
+        "tokens": tokens,
+        "rate_date": rate_date,
+        "records": records,
+    }
+    out.write_text(json.dumps(report, indent=2))
+    append_summary_row(stamp, prompt, f"{settings.llm_provider} / {model}", summary)
     print(f"Saved {out.relative_to(HERE.parent)} and updated eval/results/summary.md")
 
 

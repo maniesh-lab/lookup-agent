@@ -34,8 +34,11 @@ def convert(
     from_currency: str,
     to_currency: str,
     *,
+    on_date: str | None = None,
     client: httpx.Client | None = None,
 ) -> dict:
+    """on_date: a past date (YYYY-MM-DD) to use that day's rate instead of the
+    latest one. The agent always uses the latest; the eval re-scorer uses this."""
     src, dst = from_currency.strip().upper(), to_currency.strip().upper()
     if len(src) != 3 or len(dst) != 3 or not (src + dst).isalpha():
         return {"error": "Currency codes must be 3 letters, like USD or GBP."}
@@ -53,7 +56,9 @@ def convert(
     own_client = client is None
     client = client or httpx.Client(timeout=settings.fx_api_timeout)
     try:
-        response = client.get(f"{settings.fx_api_url}/latest", params={"base": src, "symbols": dst})
+        response = client.get(
+            f"{settings.fx_api_url}/{on_date or 'latest'}", params={"base": src, "symbols": dst}
+        )
         if response.status_code == 404 or response.status_code == 422:
             return {"error": f"The exchange-rate service doesn't support {src} or {dst}."}
         response.raise_for_status()
