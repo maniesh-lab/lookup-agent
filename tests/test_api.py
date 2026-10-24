@@ -38,6 +38,14 @@ def client():
     return TestClient(main.app)  # not used as a context manager, so startup doesn't run
 
 
+def test_chat_page(client):
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert "Lumen Lane help" in response.text
+    assert 'fetch("/chat"' in response.text
+
+
 def test_health(client):
     response = client.get("/health")
     assert response.status_code == 200

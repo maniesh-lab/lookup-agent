@@ -23,7 +23,7 @@ The demo data is a fake small shop, Lumen Lane: customers, products, orders, sup
 
 ```mermaid
 flowchart LR
-    user([User]) -->|POST /chat| api[FastAPI]
+    user([User]) -->|chat page or POST /chat| api[FastAPI]
     api --> agent[LangGraph agent<br/>step cap + memory]
     agent <-->|Steadfast| llm[(Groq / OpenAI)]
     agent --> S[search_docs] --> pg[(Postgres + pgvector)]
@@ -77,13 +77,16 @@ cp .env.example .env          # then put your key after GROQ_API_KEY=
 docker compose up --build
 ```
 
-The first start builds the database (tables, fake shop data, policy search index) and downloads the search models, so it takes a few minutes. Then open http://localhost:8000/docs and try `POST /chat`:
+The first start builds the database (tables, fake shop data, policy search index) and downloads the search models, so it takes a few minutes. Then:
+
+- **Chat page:** open http://localhost:8000 and ask a question, or pick one of the suggestions. Each answer shows which sources were checked, in order, and the details underneath (the policy section, the SQL that ran, or the exchange rate). Light and dark mode follow your system, or switch with the button in the corner.
+- **API:** open http://localhost:8000/docs and try `POST /chat`:
 
 ```json
 {"message": "What was the total of the order Priya Sharma placed on February 18, 2026, in Canadian dollars at today's rate?"}
 ```
 
-The reply has `answer`, `sources`, `tools_used` and a `thread_id`. Send the `thread_id` back with your next message to continue the same conversation.
+The reply has `answer`, `sources`, `tools_used` and a `thread_id`. Send the `thread_id` back with your next message to continue the same conversation. The chat page uses this same endpoint, so anything it does, another website, app or bot can do too.
 
 ## Run it without Docker (for development)
 
@@ -96,7 +99,7 @@ pip install -r requirements.txt
 cp .env.example .env                     # add GROQ_API_KEY
 docker compose up -d postgres            # just the database
 python -m scripts.setup_db               # schema + seed data + policy ingestion
-uvicorn app.main:app --reload            # API on http://127.0.0.1:8000
+uvicorn app.main:app --reload            # chat page and API on http://127.0.0.1:8000
 ```
 
 Other useful commands:
@@ -112,6 +115,7 @@ python -m scripts.try_tools fx 250 EUR INR
 
 | Method | Path | What it does |
 |---|---|---|
+| `GET` | `/` | The chat page |
 | `GET` | `/health` | `{"status": "ok"}` |
 | `POST` | `/chat` | Ask a question. Body: `message`, optional `thread_id` |
 | `POST` | `/ingest` | Re-index the policy documents (unchanged files are skipped). Needs `X-Ingest-Token` if `INGEST_TOKEN` is set |
@@ -153,7 +157,8 @@ The integration tests rebuild the tables in the database you point them at, so u
 
 ```
 app/
-  main.py              FastAPI app: /health, /chat, /ingest, correlation ids
+  main.py              FastAPI app: /, /health, /chat, /ingest, correlation ids
+  static/index.html    the chat page (one file, no build step)
   agent/               LangGraph graph, runner (answer + sources), prompts/v1.txt, v2.txt
   tools/               search_docs, query_database, convert_currency, registry
   retrieval/           chunking, ingestion, vector / hybrid / rerank search

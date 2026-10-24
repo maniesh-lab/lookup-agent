@@ -29,6 +29,9 @@ First full version.
 - `convert()` takes an optional `on_date` for historical rates.
 - First measured results in the README.
 
+### Added (chat page)
+- A chat page at `/` (`app/static/index.html`): suggested questions, conversation memory, a "checked" trail showing which sources each answer used, sources with the SQL, light and dark mode, works on mobile.
+
 ### Changed
 - Coverage is uploaded to Codecov on every push; the README badge shows it.
 - `docker compose up --build` checked end to end on 2026-10-24 (a MIXED question answered with the database and the currency API).

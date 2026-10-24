@@ -40,7 +40,7 @@ flowchart LR
 
 ## One request, step by step
 
-1. **FastAPI** receives `POST /chat` with a message and an optional `thread_id`. A middleware gives the request a correlation id (or keeps the caller's `X-Request-ID`) and binds it to every log line, including Steadfast's logs of each LLM call.
+1. **FastAPI** receives `POST /chat` (from the chat page at `/`, or from any other client) with a message and an optional `thread_id`. A middleware gives the request a correlation id (or keeps the caller's `X-Request-ID`) and binds it to every log line, including Steadfast's logs of each LLM call.
 2. **The agent node** sends the system prompt (`app/agent/prompts/v2.txt`), the conversation so far and the three tool descriptions to the LLM through **Steadfast**.
 3. If the model asks for tools, **the tools node** runs each one (in a thread, so the server isn't blocked) and adds the results to the conversation. Bad arguments, SQL errors and API failures come back to the model as short error messages it can act on, never as crashes.
 4. Steps 2 and 3 repeat until the model answers in plain text. A **step cap** (`MAX_AGENT_STEPS`, default 6) stops a loop: at the cap, tools are switched off and the model is told to answer with what it has.

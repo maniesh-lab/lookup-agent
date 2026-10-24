@@ -3,9 +3,11 @@ import secrets
 import time
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import structlog
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from steadfast import SteadfastError
 
@@ -16,6 +18,8 @@ from app.core.logging import configure_logging
 from app.db import plain_url
 
 log = structlog.get_logger(__name__)
+
+CHAT_PAGE = Path(__file__).parent / "static" / "index.html"
 
 
 @asynccontextmanager
@@ -77,6 +81,12 @@ def get_agent(request: Request) -> Agent:
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
+
+@app.get("/", include_in_schema=False)
+def chat_page():
+    """A small chat page that talks to POST /chat, so anyone can try the agent."""
+    return FileResponse(CHAT_PAGE, media_type="text/html")
 
 
 @app.get("/health")

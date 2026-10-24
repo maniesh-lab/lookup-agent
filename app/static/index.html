@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lumen Lane help</title>
+  <meta name="description" content="Ask about Lumen Lane orders, policies and prices. Every answer shows where it was looked up.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='9' fill='%23E2A925'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #EDF0F4;
+      --surface: #FFFFFF;
+      --surface-2: #F5F7FA;
+      --ink: #18202C;
+      --ink-soft: #4A5566;
+      --ink-faint: #7A8596;
+      --line: #D7DDE5;
+      --lamp: #E2A925;
+      --lamp-ink: #7A5500;
+      --lamp-wash: #FDF3D9;
+      --you: #22324A;
+      --you-ink: #F2F5F9;
+      --danger: #B4352B;
+      --danger-wash: #FBE9E7;
+      --focus: #2F6FD0;
+      --shadow: 0 1px 2px rgba(24, 32, 44, 0.06), 0 6px 20px rgba(24, 32, 44, 0.06);
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #11161E;
+        --surface: #19202B;
+        --surface-2: #202835;
+        --ink: #E7ECF2;
+        --ink-soft: #AAB4C2;
+        --ink-faint: #7C8797;
+        --line: #2C3644;
+        --lamp: #F2C14E;
+        --lamp-ink: #F6D27E;
+        --lamp-wash: #2E2716;
+        --you: #2B3E5C;
+        --you-ink: #EEF2F8;
+        --danger: #F08A80;
+        --danger-wash: #3A1F1D;
+        --focus: #7AA7F0;
+        --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
+        color-scheme: dark;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #11161E;
+      --surface: #19202B;
+      --surface-2: #202835;
+      --ink: #E7ECF2;
+      --ink-soft: #AAB4C2;
+      --ink-faint: #7C8797;
+      --line: #2C3644;
+      --lamp: #F2C14E;
+      --lamp-ink: #F6D27E;
+      --lamp-wash: #2E2716;
+      --you: #2B3E5C;
+      --you-ink: #EEF2F8;
+      --danger: #F08A80;
+      --danger-wash: #3A1F1D;
+      --focus: #7AA7F0;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.25);
+      color-scheme: dark;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 400 16px/1.55 "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, textarea { font: inherit; color: inherit; }
+    :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
+
+    .app {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      height: 100dvh;
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 0 16px;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 18px 0 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; min-width: 0; }
+    .lamp-dot {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: var(--lamp);
+      box-shadow: 0 0 0 4px var(--lamp-wash);
+      flex: none;
+    }
+    .brand h1 {
+      margin: 0;
+      font: 700 1.3rem/1.1 "Bricolage Grotesque", "Figtree", sans-serif;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+    }
+    .brand p { margin: 0; color: var(--ink-faint); font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tool-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      color: var(--ink-soft);
+      cursor: pointer;
+    }
+    .tool-btn:hover { color: var(--ink); border-color: var(--ink-faint); }
+    .tool-btn svg { width: 16px; height: 16px; }
+
+    /* Conversation */
+    main {
+      overflow-y: auto;
+      padding: 24px 0 8px;
+      scroll-behavior: smooth;
+    }
+    .welcome { padding: 8vh 0 0; }
+    .welcome h2 {
+      font: 700 clamp(1.7rem, 4.5vw, 2.4rem)/1.12 "Bricolage Grotesque", "Figtree", sans-serif;
+      letter-spacing: -0.02em;
+      margin: 0 0 12px;
+      max-width: 20ch;
+    }
+    .welcome > p { color: var(--ink-soft); margin: 0 0 28px; max-width: 56ch; }
+    .sources-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 28px; padding: 0; list-style: none; }
+    .suggestions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; max-width: 640px; }
+    .suggestion {
+      text-align: left;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 12px 14px;
+      cursor: pointer;
+      color: var(--ink);
+      line-height: 1.4;
+    }
+    .suggestion:hover { border-color: var(--ink-faint); }
+    .suggestion small { display: block; color: var(--ink-faint); font-size: 0.78rem; margin-bottom: 4px; }
+
+    .msg { margin: 0 0 22px; }
+    .msg.you { display: flex; justify-content: flex-end; }
+    .msg.you .bubble {
+      background: var(--you);
+      color: var(--you-ink);
+      border-radius: 16px 16px 4px 16px;
+      padding: 10px 14px;
+      max-width: min(85%, 560px);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .answer {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 4px 16px 16px 16px;
+      box-shadow: var(--shadow);
+      max-width: 100%;
+      overflow: hidden;
+    }
+
+    /* The lookup trail: the one loud thing on the page */
+    .trail {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+      padding: 10px 16px;
+      background: var(--lamp-wash);
+      border-bottom: 1px solid var(--line);
+      font-size: 0.82rem;
+      color: var(--lamp-ink);
+    }
+    .trail .label { font-weight: 600; margin-right: 2px; }
+    .trail .arrow { color: var(--ink-faint); }
+    .step {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 2px 9px 2px 7px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid color-mix(in srgb, var(--lamp) 45%, var(--line));
+      color: var(--ink);
+      font-weight: 500;
+    }
+    .step svg { width: 14px; height: 14px; color: var(--lamp-ink); }
+    .trail.none { background: var(--surface-2); color: var(--ink-faint); }
+
+    .answer-body { padding: 14px 16px 6px; overflow-wrap: anywhere; }
+    .answer-body > :first-child { margin-top: 0; }
+    .answer-body p, .answer-body ul, .answer-body ol { margin: 0 0 10px; }
+    .answer-body ul, .answer-body ol { padding-left: 1.3em; }
+    .answer-body table { border-collapse: collapse; margin: 4px 0 12px; font-size: 0.9rem; display: block; overflow-x: auto; }
+    .answer-body th, .answer-body td { border: 1px solid var(--line); padding: 5px 9px; text-align: left; }
+    .answer-body th { background: var(--surface-2); font-weight: 600; }
+    .answer-body code { font: 0.85em "JetBrains Mono", ui-monospace, monospace; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+    .answer-body blockquote { margin: 0 0 10px; padding-left: 12px; border-left: 3px solid var(--line); color: var(--ink-soft); }
+
+    .sources { padding: 4px 16px 12px; }
+    .sources > summary {
+      cursor: pointer;
+      color: var(--ink-soft);
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 6px 0;
+      list-style: none;
+    }
+    .sources > summary::-webkit-details-marker { display: none; }
+    .sources > summary::before { content: "▸ "; color: var(--ink-faint); }
+    .sources[open] > summary::before { content: "▾ "; }
+    .source-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 8px; }
+    .source {
+      display: grid; grid-template-columns: 20px 1fr; gap: 2px 8px;
+      font-size: 0.86rem;
+      color: var(--ink-soft);
+    }
+    .source svg { width: 16px; height: 16px; margin-top: 2px; color: var(--ink-faint); }
+    .source strong { color: var(--ink); font-weight: 600; }
+    .source pre {
+      grid-column: 2;
+      margin: 4px 0 0;
+      padding: 8px 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font: 0.78rem/1.5 "JetBrains Mono", ui-monospace, monospace;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      color: var(--ink);
+    }
+
+    .thinking {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 10px 14px;
+      border: 1px dashed color-mix(in srgb, var(--lamp) 60%, var(--line));
+      border-radius: 4px 16px 16px 16px;
+      background: var(--surface);
+      color: var(--ink-soft);
+      font-size: 0.92rem;
+    }
+    .thinking .lamp-dot { width: 10px; height: 10px; animation: glow 1.4s ease-in-out infinite; }
+    @keyframes glow {
+      0%, 100% { box-shadow: 0 0 0 2px var(--lamp-wash); opacity: 0.55; }
+      50% { box-shadow: 0 0 0 7px var(--lamp-wash); opacity: 1; }
+    }
+
+    .error {
+      border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--line));
+      background: var(--danger-wash);
+      color: var(--danger);
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 0.92rem;
+    }
+    .error button { margin-top: 8px; }
+
+    /* Composer */
+    footer { padding: 10px 0 16px; }
+    .composer {
+      display: flex; align-items: flex-end; gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 8px 8px 8px 14px;
+      box-shadow: var(--shadow);
+    }
+    .composer:focus-within { border-color: var(--focus); }
+    .composer textarea {
+      flex: 1;
+      border: 0; outline: 0; resize: none;
+      background: transparent;
+      max-height: 160px;
+      padding: 6px 0;
+      line-height: 1.45;
+    }
+    .composer textarea::placeholder { color: var(--ink-faint); }
+    .send {
+      flex: none;
+      width: 40px; height: 40px;
+      border: 0; border-radius: 12px;
+      background: var(--ink);
+      color: var(--bg);
+      display: grid; place-items: center;
+      cursor: pointer;
+    }
+    .send:disabled { opacity: 0.35; cursor: not-allowed; }
+    .send svg { width: 18px; height: 18px; }
+    .hint { color: var(--ink-faint); font-size: 0.76rem; margin: 6px 4px 0; }
+
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+    @media (max-width: 560px) {
+      .brand p { display: none; }
+      .tool-btn .btn-text { display: none; }
+      .welcome { padding-top: 3vh; }
+      .suggestions { grid-template-columns: 1fr; }
+      .hint { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      main { scroll-behavior: auto; }
+      .thinking .lamp-dot { animation: none; opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></symbol>
+    <symbol id="i-db" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.5" rx="7" ry="2.5"/><path d="M5 5.5v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6M5 11.5v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6"/></symbol>
+    <symbol id="i-rate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13l-3-3M20 16H7l3 3"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
+    <symbol id="i-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></symbol>
+    <symbol id="i-new" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></symbol>
+  </svg>
+
+  <div class="app">
+    <header>
+      <div class="brand">
+        <span class="lamp-dot" aria-hidden="true"></span>
+        <div>
+          <h1>Lumen Lane help</h1>
+          <p>Answers checked against our policies, orders and live rates</p>
+        </div>
+      </div>
+      <button class="tool-btn" id="newChat" type="button" title="Start a new conversation">
+        <svg aria-hidden="true"><use href="#i-new"/></svg><span class="btn-text">New conversation</span>
+      </button>
+      <button class="tool-btn" id="themeBtn" type="button" aria-live="polite">
+        <svg aria-hidden="true"><use id="themeIcon" href="#i-auto"/></svg><span class="btn-text" id="themeText">System</span>
+      </button>
+    </header>
+
+    <main id="log" aria-live="polite" aria-busy="false">
+      <section class="welcome" id="welcome">
+        <h2>Ask about an order, a policy or a price.</h2>
+        <p>Every answer shows where it was looked up: the policy documents, the shop's order records, or today's exchange rate. If the information doesn't exist, it says so.</p>
+        <ul class="sources-legend" aria-label="Where answers come from">
+          <li class="step"><svg aria-hidden="true"><use href="#i-doc"/></svg>Policy documents</li>
+          <li class="step"><svg aria-hidden="true"><use href="#i-db"/></svg>Shop database</li>
+          <li class="step"><svg aria-hidden="true"><use href="#i-rate"/></svg>Live exchange rates</li>
+        </ul>
+        <div class="suggestions">
+          <button class="suggestion" type="button"><small>Policy</small>Do I pay return shipping if you sent the wrong item?</button>
+          <button class="suggestion" type="button"><small>Orders</small>Which 3 products sold the most between April and June 2026?</button>
+          <button class="suggestion" type="button"><small>Orders and rates</small>What was Priya Sharma's February 18, 2026 order total in Canadian dollars?</button>
+          <button class="suggestion" type="button"><small>Orders and policy</small>How many March 2026 orders are still processing, and how fast should they have shipped?</button>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <form class="composer" id="form">
+        <label for="input" class="sr-only">Your question</label>
+        <textarea id="input" rows="1" maxlength="2000" placeholder="Ask a question…" autocomplete="off"></textarea>
+        <button class="send" id="send" type="submit" disabled aria-label="Send question">
+          <svg aria-hidden="true"><use href="#i-send"/></svg>
+        </button>
+      </form>
+      <p class="hint">Enter to send, Shift + Enter for a new line. Demo shop data covers January to June 2026.</p>
+    </footer>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+  <script>
+    "use strict";
+
+    const log = document.getElementById("log");
+    const form = document.getElementById("form");
+    const input = document.getElementById("input");
+    const sendBtn = document.getElementById("send");
+    const welcome = document.getElementById("welcome");
+
+    let threadId = null;
+    let busy = false;
+
+    // ---------- Theme: system -> light -> dark ----------
+    const THEMES = ["system", "light", "dark"];
+    const THEME_UI = { system: ["#i-auto", "System"], light: ["#i-sun", "Light"], dark: ["#i-moon", "Dark"] };
+
+    function readTheme() {
+      try { return localStorage.getItem("lumen-theme") || "system"; } catch { return "system"; }
+    }
+    function applyTheme(theme) {
+      if (theme === "system") document.documentElement.removeAttribute("data-theme");
+      else document.documentElement.setAttribute("data-theme", theme);
+      const [icon, text] = THEME_UI[theme];
+      document.getElementById("themeIcon").setAttribute("href", icon);
+      document.getElementById("themeText").textContent = text;
+      document.getElementById("themeBtn").setAttribute("aria-label", `Theme: ${text}. Click to change.`);
+      try { localStorage.setItem("lumen-theme", theme); } catch { /* storage unavailable */ }
+    }
+    let theme = readTheme();
+    applyTheme(THEMES.includes(theme) ? theme : "system");
+    document.getElementById("themeBtn").addEventListener("click", () => {
+      theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+      applyTheme(theme);
+    });
+
+    // ---------- Helpers ----------
+    function el(tag, attrs = {}, children = []) {
+      const node = document.createElement(tag);
+      for (const [key, value] of Object.entries(attrs)) {
+        if (key === "text") node.textContent = value;
+        else if (key === "html") node.innerHTML = value;
+        else node.setAttribute(key, value);
+      }
+      for (const child of [].concat(children)) if (child) node.append(child);
+      return node;
+    }
+    function icon(id) {
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("aria-hidden", "true");
+      const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+      use.setAttribute("href", id);
+      svg.append(use);
+      return svg;
+    }
+    function renderMarkdown(text) {
+      if (window.marked && window.DOMPurify) {
+        return DOMPurify.sanitize(marked.parse(text, { gfm: true, breaks: true }));
+      }
+      const safe = text.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+      return safe.split(/\n{2,}/).map(p => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("");
+    }
+    function scrollDown() { log.scrollTop = log.scrollHeight; }
+
+    // The answer ends with a "Sources: ..." line for API users. The page already
+    // lists the sources under the answer, so that line is dropped here.
+    function stripSourcesLine(text) {
+      return text.replace(/\n+\s*\**sources?\**\s*:[^\n]*\s*$/i, "").trim();
+    }
+
+    const TOOL_STEPS = {
+      search_docs: ["#i-doc", "Policy documents"],
+      query_database: ["#i-db", "Shop database"],
+      convert_currency: ["#i-rate", "Live exchange rate"],
+    };
+    const SOURCE_ICONS = { document: "#i-doc", database: "#i-db", api: "#i-rate" };
+
+    // ---------- Rendering ----------
+    function addUserMessage(text) {
+      log.append(el("div", { class: "msg you" }, el("div", { class: "bubble", text })));
+      scrollDown();
+    }
+
+    function trail(toolsUsed) {
+      const steps = [];
+      for (const name of toolsUsed) {          // keep order, drop repeats in a row
+        if (steps[steps.length - 1] !== name) steps.push(name);
+      }
+      const node = el("div", { class: steps.length ? "trail" : "trail none" });
+      if (!steps.length) {
+        node.append(el("span", { text: "Answered without looking anything up" }));
+        return node;
+      }
+      node.append(el("span", { class: "label", text: "Checked" }));
+      steps.forEach((name, i) => {
+        if (i) node.append(el("span", { class: "arrow", "aria-hidden": "true", text: "→" }));
+        const [iconId, label] = TOOL_STEPS[name] || ["#i-doc", name];
+        node.append(el("span", { class: "step" }, [icon(iconId), label]));
+      });
+      return node;
+    }
+
+    function sourcesBlock(sources) {
+      if (!sources || !sources.length) return null;
+      const list = el("ul", { class: "source-list" });
+      for (const s of sources) {
+        const parts = [el("strong", { text: s.name })];
+        if (s.section) parts.push(document.createTextNode(` · ${s.section.split(" > ").pop()}`));
+        if (s.detail) parts.push(document.createTextNode(` · ${s.detail}`));
+        const item = el("li", { class: "source" }, [icon(SOURCE_ICONS[s.type] || "#i-doc"), el("span", {}, parts)]);
+        if (s.query) item.append(el("pre", { text: s.query }));
+        list.append(item);
+      }
+      const count = sources.length === 1 ? "1 source" : `${sources.length} sources`;
+      return el("details", { class: "sources" }, [el("summary", { text: count }), list]);
+    }
+
+    function addAnswer(data) {
+      const card = el("article", { class: "answer" }, [
+        trail(data.tools_used || []),
+        el("div", { class: "answer-body", html: renderMarkdown(stripSourcesLine(data.answer || "")) }),
+        sourcesBlock(data.sources),
+      ]);
+      log.append(el("div", { class: "msg bot" }, card));
+      scrollDown();
+    }
+
+    function addError(message, retryText) {
+      const box = el("div", { class: "error", role: "alert" }, el("div", { text: message }));
+      if (retryText) {
+        const retry = el("button", { class: "tool-btn", type: "button", text: "Try again" });
+        retry.addEventListener("click", () => { box.parentElement.remove(); ask(retryText, { echo: false }); });
+        box.append(retry);
+      }
+      log.append(el("div", { class: "msg bot" }, box));
+      scrollDown();
+    }
+
+    function showThinking() {
+      const node = el("div", { class: "msg bot", id: "thinking" },
+        el("div", { class: "thinking" }, [el("span", { class: "lamp-dot", "aria-hidden": "true" }), "Looking it up…"]));
+      log.append(node);
+      scrollDown();
+      return node;
+    }
+
+    // ---------- Talking to the API ----------
+    function errorMessage(status, body) {
+      if (status === 503) return "The language model is unavailable right now. Try again in a moment.";
+      if (status === 422) return "That question couldn't be sent. Questions need 1 to 2,000 characters.";
+      if (body && typeof body.detail === "string") return body.detail;
+      return `The server returned an error (${status}). Try again in a moment.`;
+    }
+
+    async function ask(text, { echo = true } = {}) {
+      if (busy) return;
+      busy = true;
+      log.setAttribute("aria-busy", "true");
+      updateSend();
+      welcome.hidden = true;
+      if (echo) addUserMessage(text);
+      const thinking = showThinking();
+      try {
+        const res = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text, thread_id: threadId }),
+        });
+        let body = null;
+        try { body = await res.json(); } catch { /* not JSON */ }
+        thinking.remove();
+        if (!res.ok) { addError(errorMessage(res.status, body), text); return; }
+        threadId = body.thread_id;
+        addAnswer(body);
+      } catch {
+        thinking.remove();
+        addError("Couldn't reach the server. Check that lookup-agent is running, then try again.", text);
+      } finally {
+        busy = false;
+        log.setAttribute("aria-busy", "false");
+        updateSend();
+        input.focus();
+      }
+    }
+
+    // ---------- Composer ----------
+    function updateSend() { sendBtn.disabled = busy || !input.value.trim(); }
+    function autoGrow() { input.style.height = "auto"; input.style.height = `${Math.min(input.scrollHeight, 160)}px`; }
+
+    input.addEventListener("input", () => { autoGrow(); updateSend(); });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
+    });
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text || busy) return;
+      input.value = "";
+      autoGrow();
+      ask(text);
+    });
+    for (const btn of document.querySelectorAll(".suggestion")) {
+      btn.addEventListener("click", () => ask(btn.lastChild.textContent.trim()));
+    }
+    document.getElementById("newChat").addEventListener("click", () => {
+      if (busy) return;
+      threadId = null;
+      for (const node of [...log.children]) if (node !== welcome) node.remove();
+      welcome.hidden = false;
+      input.focus();
+    });
+
+    input.focus();
+  </script>
+</body>
+</html>
