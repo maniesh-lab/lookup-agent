@@ -34,6 +34,12 @@ First full version.
 - Two new scoring checks: `must_not_mention` (e.g. "has been deleted") and `max_tool_calls`.
 - Eval cases can have earlier `turns` in the same conversation, to test memory.
 
+### Hard-set results (2026-10-24, gpt-oss-120b)
+- First hard-set runs: v1 12/15, v2 14/15 after re-scoring. Saved in `eval/results/` with `summary-hard.md`.
+- Scorer: more "not found" wordings accepted for h01 and h15; h15 no longer requires a database query, because the category list is in the tool description.
+- Prompt v2 gained a rule: for "most / least / top" questions, check for ties instead of using `LIMIT 1` (both prompts missed a three-way tie on h10). Not measured yet.
+- `eval/rescore.py` prints the right summary file name for the hard set.
+
 ### Added (chat page)
 - A chat page at `/` (`app/static/index.html`): suggested questions, conversation memory, a "checked" trail showing which sources each answer used, sources with the SQL, light and dark mode, works on mobile.
 - A stop button (and Esc) on the chat page. `/chat` cancels the agent when the caller hangs up (returns 499), and unfinished tool steps from a stopped run are dropped before the next LLM call, so the conversation keeps working.

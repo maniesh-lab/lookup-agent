@@ -64,7 +64,24 @@ How to read this:
 - **Search is saturated too.** With nine short documents on clearly different topics, plain vector search already finds the right file every time; hybrid search and the reranker only shuffle the order slightly. They would matter on a bigger or messier document set.
 - **Small sample**: one run per prompt, one model.
 
-Every answer from both runs, with its score, is saved in [`eval/results/`](eval/results/) (`summary.md` lists the runs).
+**Harder questions** (`python -m eval.run_eval --set hard`, 15 questions, measured on 2026-10-24 with `openai/gpt-oss-120b` on Groq):
+
+| | Prompt v1 | Prompt v2 |
+|---|---|---|
+| Passed | 12/15 | 14/15 |
+| TRAP (data that doesn't exist) | 4/5 | 5/5 |
+| SAFETY (asked to delete or refund) | 2/2 | 2/2 |
+| FOLLOWUP (needs the earlier messages) | 2/2 | 2/2 |
+| PARTIAL (half answerable) | 1/2 | 2/2 |
+| REASONING (ties, thresholds, dates) | 3/4 | 3/4 |
+| Tool calls, total | 30 | 18 |
+
+- **Here the prompts do differ.** With v1 the agent made 6 tool calls looking for a customer who doesn't exist (and searched the policy documents for her), and answered "which staff member handles each ticket" with a long ticket table without saying staff aren't stored. v2 handled both.
+- **Both missed a tie.** Three products sold 25 units each; the agent's SQL used `LIMIT 1` and named only one. v2 now has a rule about ties; that rule hasn't been measured yet.
+- These numbers are after re-scoring: the first pass marked two correct "there's no toys category" answers as wrong because of their wording, and the scorer's phrase list was extended.
+- Run on the 120b model because the 20b model's free daily token limit was used up that day, so these are not directly comparable with the 41-question runs above.
+
+Every answer from every run, with its score, is saved in [`eval/results/`](eval/results/) (`summary.md` and `summary-hard.md` list the runs).
 
 ## Quick start (Docker)
 
@@ -183,7 +200,8 @@ All settings come from `.env` (see `.env.example`). The main ones: `LLM_PROVIDER
 
 - Exchange rates are European Central Bank reference rates, published once per working day, so "today's rate" is the latest published one (the answer shows its date).
 - The fake shop data covers January to June 2026 only, and all prices are in USD.
-- Eval answer checks are simple text rules (a number, names or key phrases must appear). They can miss a correct answer worded in an unexpected way, and they don't catch an extra wrong claim inside an otherwise correct answer. Both prompt versions score 41/41, so the set needs harder questions to compare prompts.
+- Eval answer checks are simple text rules (a number, names or key phrases must appear). They can miss a correct answer worded in an unexpected way (this happened twice on the hard set), and they don't catch an extra wrong claim inside an otherwise correct answer.
+- Each result comes from one run of one model. The hard set is only 15 questions, so one question is about 7 points.
 
 ## License
 

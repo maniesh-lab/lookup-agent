@@ -13,14 +13,14 @@ run used (saved in the file as rate_date). Older files don't have it, so pass
 --rate-date with the date the answers mention (e.g. "rate date 2026-10-23").
 
 Needs the database (for the truth SQL) and internet (for that day's rates).
-Each file gets a "-rescored" copy next to it and a line in summary.md.
+Each file gets a "-rescored" copy next to it and a line in summary.md (or summary-hard.md).
 """
 
 import argparse
 import json
 from pathlib import Path
 
-from eval.run_eval import RESULTS, Truth, append_summary_row, load_cases, print_summary
+from eval.run_eval import RESULTS, SETS, Truth, append_summary_row, load_cases, print_summary
 from eval.scoring import score_case
 
 
@@ -65,7 +65,7 @@ def rescore_file(path: Path, rate_date: str | None) -> Path:
     model_label = f"{run.get('provider')} / {run.get('model')}"
     RESULTS.mkdir(exist_ok=True)
     append_summary_row(f"{path.stem} (re-scored)", run["prompt"], model_label, summary, eval_set)
-    print(f"Saved {out.name} and updated summary.md\n")
+    print(f"Saved {out.name} and updated {SETS[eval_set][2]}\n")
     return out
 
 

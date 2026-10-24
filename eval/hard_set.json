@@ -23,7 +23,11 @@
           "no matching",
           "isn't a customer",
           "no one named",
-          "nobody named"
+          "nobody named",
+          "able to locate",
+          "couldn't locate",
+          "could not locate",
+          "unable to find"
         ]
       ],
       "max_tool_calls": 3
@@ -371,11 +375,14 @@
       "id": "h15",
       "category": "TRAP",
       "question": "What's the cheapest product in the toys category?",
-      "expected_tools": [
-        "query_database"
-      ],
+      "note": "The category list is in the query_database tool description, so the agent may answer without running a query.",
+      "expected_tools": [],
       "must_mention": [
         [
+          "don't have a",
+          "do not have a",
+          "doesn't include",
+          "does not include",
           "no toys",
           "no products",
           "doesn't have a toys",
