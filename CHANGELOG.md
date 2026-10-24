@@ -37,7 +37,7 @@ First full version.
 ### Hard-set results (2026-10-24, gpt-oss-120b)
 - First hard-set runs: v1 12/15, v2 14/15 after re-scoring. Saved in `eval/results/` with `summary-hard.md`.
 - Scorer: more "not found" wordings accepted for h01 and h15; h15 no longer requires a database query, because the category list is in the tool description.
-- Prompt v2 gained a rule: for "most / least / top" questions, check for ties instead of using `LIMIT 1` (both prompts missed a three-way tie on h10). Not measured yet.
+- Prompt v2 gained a rule: for "most / least / top" questions, check for ties instead of using `LIMIT 1` (both prompts missed a three-way tie on h10). A re-run of h10 with the rule passed.
 - `eval/rescore.py` prints the right summary file name for the hard set.
 - Langfuse tracing checked with a real account: each chat turn shows its LLM and tool steps with timings and the prompt version. Screenshot in the README.
 

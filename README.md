@@ -77,7 +77,7 @@ How to read this:
 | Tool calls, total | 30 | 18 |
 
 - **Here the prompts do differ.** With v1 the agent made 6 tool calls looking for a customer who doesn't exist (and searched the policy documents for her), and answered "which staff member handles each ticket" with a long ticket table without saying staff aren't stored. v2 handled both.
-- **Both missed a tie.** Three products sold 25 units each; the agent's SQL used `LIMIT 1` and named only one. v2 now has a rule about ties; that rule hasn't been measured yet.
+- **Both missed a tie.** Three products sold 25 units each; the agent's SQL used `LIMIT 1` and named only one. After adding a rule about ties to v2, a re-run of that question passed: the agent fetched the top 5 rows and named all three products as tied (one question, one run).
 - These numbers are after re-scoring: the first pass marked two correct "there's no toys category" answers as wrong because of their wording, and the scorer's phrase list was extended.
 - Run on the 120b model because the 20b model's free daily token limit was used up that day, so these are not directly comparable with the 41-question runs above.
 
