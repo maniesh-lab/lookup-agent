@@ -28,7 +28,9 @@ First full version.
 - `convert()` takes an optional `on_date` for historical rates.
 - First measured results in the README.
 
+### Changed
+- Steadfast now installs from PyPI (`steadfast-llm` 0.3.0) instead of from GitHub, so the Docker image no longer needs git.
+
 ### Not done yet
 - Codecov token for the coverage badge
-- Steadfast 0.3.0 on PyPI (installed from GitHub for now)
 - Full `docker compose up --build` check, live deploy or demo GIF

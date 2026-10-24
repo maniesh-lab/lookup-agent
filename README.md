@@ -175,7 +175,6 @@ All settings come from `.env` (see `.env.example`). The main ones: `LLM_PROVIDER
 - Exchange rates are European Central Bank reference rates, published once per working day, so "today's rate" is the latest published one (the answer shows its date).
 - The fake shop data covers January to June 2026 only, and all prices are in USD.
 - Eval answer checks are simple text rules (a number, names or key phrases must appear). They can miss a correct answer worded in an unexpected way, and they don't catch an extra wrong claim inside an otherwise correct answer. Both prompt versions score 41/41, so the set needs harder questions to compare prompts.
-- Steadfast 0.3 (with tool calling) is installed from GitHub until it's published to PyPI.
 
 ## License
 

@@ -8,9 +8,7 @@ numpy>=1.26
 sentence-transformers>=3.0        # embeddings and the reranker
 langgraph>=1.0,<2                 # the agent graph
 langgraph-checkpoint-postgres>=3.0,<4   # conversation memory in Postgres
-# Steadfast 0.3 (tool calling) isn't on PyPI yet, so it's installed from GitHub.
-# Once 0.3.0 is published, replace this line with: steadfast-llm[groq,openai]>=0.3.0
-steadfast-llm[groq,openai] @ git+https://github.com/maniesh-lab/steadfast@4ab0cbee22090c86064395350e6e182ef48034f6
+steadfast-llm[groq,openai]>=0.3.0,<0.4   # LLM calls: retries, rate limits, fallback, tool calling
 structlog>=24.4                   # structured logs
 httpx>=0.27                       # HTTP calls (currency API) and API tests
 langfuse>=5,<6                    # tracing (optional at runtime)

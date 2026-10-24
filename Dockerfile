@@ -7,11 +7,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# git: needed to install Steadfast from GitHub (see requirements.txt)
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends git \
-    && rm -rf /var/lib/apt/lists/*
-
 # CPU-only PyTorch first, so sentence-transformers doesn't pull the much
 # larger CUDA build.
 RUN pip install torch --index-url https://download.pytorch.org/whl/cpu
