@@ -1,0 +1,657 @@
+{
+  "prompt": "v1",
+  "model": "openai/gpt-oss-20b",
+  "provider": "groq",
+  "tokens": 117683,
+  "records": [
+    {
+      "id": "q01",
+      "category": "DOCS",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "what's your return window?",
+      "answer": "**Return window**\n\nYou can return most items within **30 days of the delivery date**.  \nThe item must be unused, in its original packaging, and still have any tags attached.  \n\n*Source: Lumen Lane Returns Policy \u2013 \u201cReturn window\u201d section in\u202freturns.md*",
+      "tools_used": [
+        "search_docs"
+      ],
+      "seconds": 17.11
+    },
+    {
+      "id": "q02",
+      "category": "DOCS",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "Do I have to pay for return shipping if you sent me the wrong item, or is it only free when the product is defective?",
+      "answer": "You don\u2019t have to pay for return shipping if we sent you the wrong item.  \nAccording to our **Returns Policy**:\n\n> \u201cReturn shipping is free when the return is our fault: the item is defective, it arrived damaged, or we sent you the wrong item (wrong product, size or colour). In those cases we email you a prepaid return label.\u201d\n\nSo a wrong\u2011item return is covered at no cost to you.  \n(See *returns.md*, section \u201cWho pays for return shipping.\u201d)",
+      "tools_used": [
+        "search_docs"
+      ],
+      "seconds": 1.33
+    },
+    {
+      "id": "q03",
+      "category": "DOCS",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "How long does standard shipping usually take, and do you offer express delivery for an extra fee?",
+      "answer": "**Standard shipping**\n\n- Standard shipping usually takes **3 to 5 business days** after the order ships.  \n- For international deliveries outside Nepal, it can take up to **8 business days**.  \n  (Source: *shipping.md \u2013 \u201cStandard shipping\u201d*)\n\n**Express delivery**\n\n- Express delivery is available for an extra fee of **$12.99 USD** and normally arrives within **1 to 2 business days** after the order ships.  \n  (Source: *shipping.md \u2013 \u201cExpress shipping\u201d*)\n\n*Premium members* get a discounted express fee of **$4.99 USD** instead of $12.99.",
+      "tools_used": [
+        "search_docs"
+      ],
+      "seconds": 1.63
+    },
+    {
+      "id": "q04",
+      "category": "DOCS",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "Does the warranty cover products I bought as a gift for someone else, and what do I need to show to make a claim?",
+      "answer": "Yes \u2013 the warranty is attached to the product itself, not to the person who paid for it.  \nIf you bought a gift, the recipient can still file a warranty claim on the item.\n\n**What you\u2019ll need to provide to make a claim**\n\n| Item | Details |\n|------|---------|\n| Proof of purchase | Order number, a gift receipt, or the buyer\u2019s email address (so we can locate the order) |\n| Description of the problem | A short written explanation |\n| Visual evidence | Photos or a short video that clearly shows the defect |\n| Serial number | For electronics (if applicable) |\n\nOnce you have those, open a support ticket with the topic \u201cquality\u201d and we\u2019ll get back to you within 48\u202fhours (12\u202fhours for Premium members). If the product needs to be returned, we\u2019ll send a prepaid shipping label\u2014no shipping cost on warranty claims.  \n\n*Source: Lumen Lane Warranty Policy (warranty.md)*",
+      "tools_used": [
+        "search_docs"
+      ],
+      "seconds": 1.68
+    },
+    {
+      "id": "q05",
+      "category": "DOCS",
+      "passed": false,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": false,
+      "failures": [
+        "answer doesn't mention any of ['14-day', '14 days', '14 day']"
+      ],
+      "question": "Is there a free trial for the premium plan, and what happens to my premium benefits if a monthly payment fails?",
+      "answer": "**Free trial**\n\n- New customers can sign up for a **14\u2011day free trial** of the Premium plan.  \n- The trial can be used **once per customer**.  \n- If you cancel before the trial ends, you are not charged.  \n\n*Source: \u201cPremium Membership > Price and free trial\u201d in `premium-membership.md`.*\n\n**What happens if a monthly payment fails**\n\n1. We\u2019ll email you and attempt to charge the card again after **3 days** and again after **7 days**.  \n2. During the **7\u2011day grace period** that starts on the day of the failed payment, your Premium benefits remain active.  \n3. If the payment still hasn\u2019t cleared when the grace period ends, your account automatically reverts to the Basic plan and Premium benefits are paused.  \n4. Once a payment succeeds, the Premium benefits are restored immediately.  \n5. Any benefits you would have had during the pause (e.g., free shipping on an order placed while paused) are **not refunded**.  \n\n*Source: \u201cPremium Membership > If a monthly payment fails\u201d in `premium-membership.md`.*",
+      "tools_used": [
+        "search_docs"
+      ],
+      "seconds": 4.65
+    },
+    {
+      "id": "q06",
+      "category": "DOCS",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "how long do refunds take to show up on my card?",
+      "answer": "**Refunds to your card**\n\nOnce we issue a refund, the money is sent back to the original payment method.  \nYour bank or card provider normally takes **5 to 10 business days** to post the refund on your statement.  \nFrom the day the returned item reaches us, most customers see the refund within about **two weeks**.  \n\nIf 10 business days have passed since we sent the refund email and you still don\u2019t see it, first check with your bank and then open a support ticket with us.\n\n*Source: Lumen Lane policy \u2013 \u201cRefund Policy > How long refunds take to reach your card\u201d*",
+      "tools_used": [
+        "search_docs"
+      ],
+      "seconds": 15.09
+    },
+    {
+      "id": "q07",
+      "category": "DOCS",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "Can I change the delivery address after placing an order, and if the package is already out for delivery, what are my options?",
+      "answer": "**Changing the delivery address**\n\n- **While the order is still \u201cprocessing\u201d** (usually within the first 2 business days after you place it) you can change the address.  \n  *How:* Log into your account and edit the address, or open a support ticket with the topic \u201cdelivery\u201d and give the new address.  \n  *Source:* *order\u2011changes.md \u2013 \u201cChanging the delivery address\u201d*.\n\n- **Once the order has shipped** we can\u2019t change the address ourselves. We can ask the courier to redirect the parcel, but this is only possible if the request is made at least a day before the scheduled delivery, and we can\u2019t guarantee it.  \n  *Source:* *order\u2011changes.md \u2013 \u201cChanging the delivery address\u201d*.\n\n**If the parcel is already out for delivery**\n\nWhen the courier has already taken the package, the address can\u2019t be altered. Your options are:\n\n1. **Ask the courier to hold the parcel at a nearby pickup point** \u2013 use the courier\u2019s tracking link to request a hold.  \n2. **Have someone at the address receive it for you** \u2013 a neighbour or a trusted person can accept the delivery.  \n3. **Refuse the delivery** \u2013 the parcel will be returned to us. We will refund the order amount minus the original shipping fee.  \n   *Source:* *order\u2011changes.md \u2013 \u201cIf the parcel is already out for delivery\u201d*.\n\nFeel free to let me know if you need help opening a support ticket or contacting the courier!",
+      "tools_used": [
+        "search_docs"
+      ],
+      "seconds": 15.82
+    },
+    {
+      "id": "q08",
+      "category": "DB",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "How many orders were cancelled between January 1 and January 31, 2026?",
+      "answer": "Between January\u202f1 and January\u202f31,\u202f2026, **1 order was cancelled**.  \n(Information retrieved from the orders table in the shop database.)",
+      "tools_used": [
+        "query_database"
+      ],
+      "seconds": 10.7
+    },
+    {
+      "id": "q09",
+      "category": "DB",
+      "passed": false,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": false,
+      "failures": [
+        "answer is missing ['Leo Karki']"
+      ],
+      "question": "List the names and cities of premium customers who signed up between January 1 and February 15, 2026 and placed at least one non-cancelled order over $150 before June 30, 2026.",
+      "answer": "**Premium customers who signed up between 2026\u201101\u201101 and 2026\u201102\u201115 and placed at least one non\u2011cancelled order over $150 before 2026\u201106\u201130**\n\n| Name | City |\n|------|------|\n| Leo\u202fKarki | Kathmandu |\n\n*Source: Query of the shop database (customers and orders tables).*",
+      "tools_used": [
+        "query_database"
+      ],
+      "seconds": 7.42
+    },
+    {
+      "id": "q10",
+      "category": "DB",
+      "passed": false,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": false,
+      "failures": [
+        "answer is missing ['Orbit USB-C Hub']"
+      ],
+      "question": "Which 3 products had the highest total quantity sold in orders placed between April 1 and June 30, 2026, not counting cancelled orders?",
+      "answer": "The three products that sold the most units (excluding cancelled orders) between\u202fApril\u202f1\u202fand\u202fJune\u202f30\u202f2026 were:\n\n| Rank | Product ID | Product Name          | Total Quantity Sold |\n|------|------------|-----------------------|---------------------|\n| 1    | 6          | Orbit USB\u2011C Hub       | 25                  |\n| 2    | 8          | Swift Wireless Mouse | 25                  |\n| 3    | 13         | Bamboo Cutting Board | 25                  |\n\n*Source: Query result from the shop database (orders, order_items, and products tables).*",
+      "tools_used": [
+        "query_database"
+      ],
+      "seconds": 9.57
+    },
+    {
+      "id": "q11",
+      "category": "DB",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "What's the average order total for basic-plan customers in Kathmandu for non-cancelled orders placed between January 1 and June 30, 2026?",
+      "answer": "The average total for non\u2011cancelled orders placed between\u202fJanuary\u202f1\u202fand\u202fJune\u202f30\u202f2026 by customers on the **basic** plan in **Kathmandu** is **$123.42** (rounded to two decimal places). This figure comes from a direct query of the shop\u2019s orders and customers tables.",
+      "tools_used": [
+        "query_database"
+      ],
+      "seconds": 13.15
+    },
+    {
+      "id": "q12",
+      "category": "DB",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "how many customers have more than one open delivery ticket created between February 1 and May 31, 2026?",
+      "answer": "There is **1 customer** who has more than one open delivery\u2011related support ticket created between February\u202f1 and May\u202f31,\u202f2026.  \n*Source: query to the shop database (support_tickets table).*",
+      "tools_used": [
+        "query_database"
+      ],
+      "seconds": 9.13
+    },
+    {
+      "id": "q13",
+      "category": "DB",
+      "passed": false,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": false,
+      "failures": [
+        "answer is missing ['Grace Okafor']"
+      ],
+      "question": "Which customers bought something from the electronics category in a non-cancelled order dated between May 1 and May 31, 2026 and later opened a \"quality\" ticket on or before June 30, 2026?",
+      "answer": "**Customers who meet the criteria**\n\n| Customer ID | Full Name      | Email                         |\n|-------------|----------------|-------------------------------|\n| 159         | Grace\u202fOkafor   | grace.okafor.159@example.com |\n\n*These customers placed a non\u2011cancelled order containing an electronics product between\u202fMay\u202f1\u202f\u2013\u202fMay\u202f31\u202f2026 and subsequently opened a \u201cquality\u201d support ticket on or before\u202fJune\u202f30\u202f2026.*\n\n**Source**\n\nThe information comes from a database query that joined the `customers`, `orders`, `order_items`, `products`, and `support_tickets` tables and applied the specified date ranges, status, and topic filters. The query returned the single matching customer record.",
+      "tools_used": [
+        "query_database"
+      ],
+      "seconds": 17.07
+    },
+    {
+      "id": "q14",
+      "category": "API",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "What's the exchange rate from GBP to USD today?",
+      "answer": "The current exchange rate (as of 2026\u201110\u201123) is:\n\n**1\u202fGBP \u2248 1.34\u202fUSD** (exact rate\u202f1.3368\u202fUSD per GBP)\n\n*Source: Frankfurter API (European Central Bank reference rates).*",
+      "tools_used": [
+        "convert_currency"
+      ],
+      "seconds": 7.62
+    },
+    {
+      "id": "q15",
+      "category": "API",
+      "passed": false,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": false,
+      "failures": [
+        "answer doesn't contain the converted amount ~26568.0"
+      ],
+      "question": "Convert 250 euros to Indian rupees at the current rate.",
+      "answer": "**250\u202fEUR \u2192 INR**\n\n- Current exchange rate (2026\u201110\u201123): **1\u202fEUR = 106.272\u202fINR**  \n- Converted amount: **250\u202fEUR \u00d7 106.272\u202fINR/EUR = 26\u202f568\u202fINR**\n\n*Source: Frankfurter API (European Central Bank reference rates).*",
+      "tools_used": [
+        "convert_currency"
+      ],
+      "seconds": 7.9
+    },
+    {
+      "id": "q16",
+      "category": "API",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "what's the current rate for Australian dollars against US dollars, and how much is 500 AUD in USD?",
+      "answer": "**Current exchange rate (AUD \u2192 USD)**  \n- 1\u202fAUD = **0.70224\u202fUSD** (rate as of 2026\u201110\u201123, from the European Central Bank reference rates via the Frankfurter API).\n\n**Conversion for 500\u202fAUD**  \n- 500\u202fAUD \u00d7 0.70224\u202fUSD/AUD = **351.12\u202fUSD** (rounded to two decimal places).",
+      "tools_used": [
+        "convert_currency"
+      ],
+      "seconds": 5.65
+    },
+    {
+      "id": "q17",
+      "category": "MIXED",
+      "passed": false,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": false,
+      "failures": [
+        "answer is missing ['Anjali Gurung', 'Daniel Brooks', 'Mei Lin Chen', 'Rohan Mehta', 'Sophie Laurent']"
+      ],
+      "question": "Which premium customers had a delivered order between January 10 and March 31, 2026 and then opened a refund ticket between April 1 and April 30, 2026, and what does the refund policy say about premium members?",
+      "answer": "**Premium customers who met the criteria**\n\n| Full name | Email |\n|-----------|-------|\n| Anjali\u202fGurung | anjali.gurung.153@example.com |\n| Daniel\u202fBrooks | daniel.brooks.154@example.com |\n| Mei\u202fLin\u202fChen | mei.lin.chen.155@example.com |\n| Rohan\u202fMehta | rohan.mehta.156@example.com |\n| Sophie\u202fLaurent | sophie.laurent.157@example.com |\n\n*These customers are on the \u201cpremium\u201d plan, had at least one order that was **delivered** between\u202f2026\u201101\u201110\u202fand\u202f2026\u201103\u201131, and opened a **refund\u2011topic** support ticket that was still **open** between\u202f2026\u201104\u201101\u202fand\u202f2026\u201104\u201130.*  \n(Information retrieved from the shop database via the `query_database` tool.)\n\n---\n\n### Refund policy for premium members\n\nAccording to Lumen Lane\u2019s refund policy:\n\n| Feature | Premium\u2011member benefit |\n|---------|------------------------|\n| **Refund speed** | Refunds are processed as soon as the courier scans the returned parcel, without waiting for the item to reach the warehouse. |\n| **Store credit option** | Premium members may choose instant store credit instead of a cash refund; the credit is worth **105\u202f%** of the refund amount. |\n| **Return shipping** | Change\u2011of\u2011mind returns are free for premium members \u2013 no return\u2011shipping fee is deducted. |\n| **Return labels** | Premium members receive free return labels for every return, including change\u2011of\u2011mind returns. |\n\nThese details are taken from the \u201cRefund Policy > Refunds for Premium members\u201d section of the policy documents (source: `refunds.md`).",
+      "tools_used": [
+        "query_database",
+        "query_database",
+        "query_database",
+        "search_docs"
+      ],
+      "seconds": 55.63
+    },
+    {
+      "id": "q18",
+      "category": "MIXED",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "What was the total of the order Priya Sharma placed on February 18, 2026, in Canadian dollars at today's rate?",
+      "answer": "Priya\u202fSharma\u2019s order on 18\u202fFeb\u202f2026 totaled **$173.50\u202fUSD**.  \nAt today\u2019s exchange rate (1\u202fUSD\u202f=\u202f1.3995\u202fCAD) that equals **$242.81\u202fCAD**.\n\n*Sources*  \n- Order total retrieved from the shop database (`query_database`).  \n- Currency conversion performed with the live rate from the European Central Bank via `convert_currency`.",
+      "tools_used": [
+        "query_database",
+        "convert_currency"
+      ],
+      "seconds": 18.83
+    },
+    {
+      "id": "q19",
+      "category": "MIXED",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "How many orders placed between March 1 and March 31, 2026 are still marked \"processing\", and according to the shipping policy, how long should they have taken to ship?",
+      "answer": "**Number of \u201cprocessing\u201d orders (March\u202f1\u202f\u2013\u202fMarch\u202f31,\u202f2026)**  \n- 3 orders are still marked **\u201cprocessing.\u201d**  \n  *Source: database query on the `orders` table.*\n\n**Shipping policy expectation**  \n- According to the Shipping Policy, every order is packed and handed to the courier **within 2 business days** of being placed.  \n  *Source: `shipping.md` \u2013 \u201cProcessing time\u201d section.*  \n\nSo, those 3 orders should have been shipped within 2 business days of their order dates. If any remain in \u201cprocessing\u201d beyond that window, they are considered delayed and a support ticket should be opened.",
+      "tools_used": [
+        "query_database",
+        "search_docs"
+      ],
+      "seconds": 16.13
+    },
+    {
+      "id": "q20",
+      "category": "MIXED",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "Omar Haddad has a damaged-item ticket dated May 9, 2026. What did he order on May 2, 2026, what's that order's total in GBP at today's rate, and does the damaged-item policy cover it?",
+      "answer": "**Order details**\n\n| Item | Quantity | Unit price (USD) |\n|------|----------|------------------|\n| Nimbus Bluetooth Speaker | 1 | $89.99 |\n| Glass Food Containers (Set of 4) | 1 | $24.99 |\n\n*Order ID:* **445**  \n*Order date:* **2026\u201105\u201102**  \n*Total:* **$114.98** (USD)\n\n**Total in GBP (today\u2019s rate)**  \nUsing the latest ECB reference rate (1\u202fUSD\u202f=\u202f0.74804\u202fGBP) the order totals **\u00a386.01**.\n\n**Damaged\u2011item policy coverage**\n\n- The ticket was opened on **2026\u201105\u201109**, **7 days after delivery** (delivery date 2026\u201105\u201102).  \n- The policy states that a damaged item must be reported within **14 days of delivery** to qualify for a free replacement or full refund, and that no return shipping is required.  \n- Therefore, Omar\u2019s claim is covered by the damaged\u2011item policy.\n\n**Sources**\n\n1. **Support ticket** \u2013 `support_tickets` table (ticket ID\u202f73, order\u202f445, created\u202f2026\u201105\u201109).  \n2. **Order information** \u2013 `orders` table (order\u202f445, date\u202f2026\u201105\u201102, total\u202f$114.98).  \n3. **Order items** \u2013 `order_items` table (products listed above).  \n4. **Currency conversion** \u2013 `convert_currency` tool (rate 0.74804, conversion to \u00a386.01).  \n5. **Damaged\u2011item policy** \u2013 `damaged-items.md` (sections on reporting window, coverage, and refund/replacement options).\n\nNo additional information was required beyond what was retrieved.",
+      "tools_used": [
+        "query_database",
+        "query_database",
+        "convert_currency",
+        "search_docs",
+        "convert_currency",
+        "query_database"
+      ],
+      "seconds": 60.42
+    },
+    {
+      "id": "q21",
+      "category": "MIXED",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "Which basic-plan customers have a combined total of more than $1,000 across their non-cancelled orders placed between January 1 and June 30, 2026, and would the premium plan's free shipping rule have applied to orders of that size?",
+      "answer": "**Basic\u2011plan customers who spent more than\u202f$1,000 on non\u2011cancelled orders (Jan\u202f1\u202f\u2013\u202fJun\u202f30\u202f2026)**  \n\n| Customer ID | Full name          | Email                           | Total spent (USD) |\n|-------------|--------------------|---------------------------------|-------------------|\n| 19          | Dipesh Garcia      | dipesh.garcia.19@example.com    | **$1,738.97** |\n| 143         | Lucas Nair         | lucas.nair.143@example.com      | **$1,367.50** |\n| 69          | Mason Shrestha     | mason.shrestha.69@example.com   | **$1,249.49** |\n| 8           | Nabin Magar        | nabin.magar.8@example.com       | **$1,197.00** |\n| 68          | Emma Muller        | emma.muller.68@example.com      | **$1,118.00** |\n| 45          | Chloe Brown        | chloe.brown.45@example.com      | **$1,057.00** |\n| 98          | Oliver Walker      | oliver.walker.98@example.com    | **$1,006.50** |\n\n*Source: `query_database` result \u2013 customers with plan\u202f=\u202fbasic, non\u2011cancelled orders between 2026\u201101\u201101 and 2026\u201106\u201130, summed totals >\u202f$1,000.*\n\n---\n\n### Would the premium plan\u2019s free\u2011shipping rule have applied to orders of that size?\n\n**Premium\u2011plan free\u2011shipping policy** (from *shipping.md*):  \n> \u201cPremium members get free standard shipping on every order over **$25\u202fUSD**, and express shipping for a reduced fee of $4.99\u202fUSD.\u201d\n\nBecause the threshold for free standard shipping is only $25\u202fUSD, **every order that these customers placed (and that was over $25\u202fUSD) would have qualified for free standard shipping if they were premium members**. The rule is evaluated per individual order, not on the combined total of multiple orders. Thus, for each of the orders that contributed to the totals above, a premium\u2011plan customer would have received free standard shipping.",
+      "tools_used": [
+        "search_docs",
+        "query_database"
+      ],
+      "seconds": 30.76
+    },
+    {
+      "id": "q22",
+      "category": "NONE",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "What was the shop's profit margin for the first quarter of 2026?",
+      "answer": "I\u2019m sorry, but the shop\u2019s database only contains sales totals (the `orders.total` field) and no information about costs, expenses, or profit calculations. Because of that, I can\u2019t compute or retrieve a profit\u2011margin figure for any period, including Q1\u202f2026. If you have any other question\u2014such as total revenue, number of orders, or customer statistics\u2014I\u2019d be happy to help with that.",
+      "tools_used": [],
+      "seconds": 1.89
+    },
+    {
+      "id": "q23",
+      "category": "NONE",
+      "passed": false,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": false,
+      "failures": [
+        "answer doesn't say the information is unavailable"
+      ],
+      "question": "Which warehouse employee packed my order from June 2, 2026?",
+      "answer": "I\u2019m sorry, but the shop\u2019s records don\u2019t keep track of which individual warehouse employee packed a particular order. The order data (in the `orders` and `order_items` tables) only records the customer, order date, status, and items, not the staff member who handled it. The policy documents also don\u2019t provide that level of detail. If you need more information about the handling of your order, you might want to open a support ticket or contact customer service directly.",
+      "tools_used": [
+        "search_docs",
+        "search_docs"
+      ],
+      "seconds": 25.03
+    },
+    {
+      "id": "q24",
+      "category": "NONE",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "Will the Blue Ridge smartwatch be back in stock before the end of July 2026?",
+      "answer": "I\u2019m sorry, but I don\u2019t have any information on when the Blue\u202fRidge smartwatch will be restocked. Our database tracks orders, products, and support tickets, but it doesn\u2019t include inventory levels or restock schedules. If you\u2019d like, I can open a support ticket for you so the team can look into availability and let you know as soon as the item is back in stock.",
+      "tools_used": [
+        "search_docs",
+        "search_docs",
+        "search_docs",
+        "search_docs"
+      ],
+      "seconds": 58.01
+    },
+    {
+      "id": "q25",
+      "category": "NONE",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "how many people visited the website on March 15, 2026?",
+      "answer": "I\u2019m sorry, but the shop\u2019s database and policy documents don\u2019t contain any information about website traffic or visitor counts. I don\u2019t have a source that records how many people visited the site on March\u202f15,\u202f2026. If you have access to your analytics platform (e.g., Google Analytics, Matomo, etc.), you can retrieve that number from there.",
+      "tools_used": [],
+      "seconds": 0.55
+    },
+    {
+      "id": "q26",
+      "category": "DOCS",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "Can I return a vitamin C serum I've already opened?",
+      "answer": "No \u2013 once a beauty or personal\u2011care item like a vitamin\u202fC serum has been opened, it is considered a \u201cfinal\u2011sale\u201d item and cannot be returned unless it is defective.  \n\n**Policy source:** *Returns Policy \u2013 Items that cannot be returned* (returns.md) \u2013 \u201cOpened beauty and personal\u2011care products (for example face wash, serums and hand cream), gift cards, and items marked \u201cfinal sale\u201d cannot be returned unless they are defective.\u201d",
+      "tools_used": [
+        "search_docs"
+      ],
+      "seconds": 1.59
+    },
+    {
+      "id": "q27",
+      "category": "DOCS",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "How much does Premium cost per month?",
+      "answer": "Premium membership costs **$8.99 USD per month** (or $89 USD per year).  \n*Source: \u201cPremium Membership > Price and free trial\u201d section of the Lumen Lane policy documents.*",
+      "tools_used": [
+        "search_docs"
+      ],
+      "seconds": 6.36
+    },
+    {
+      "id": "q28",
+      "category": "DOCS",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "How quickly do premium members get a reply from support?",
+      "answer": "Premium members receive priority support, with replies to their tickets within **12 hours**.  \nThis is stated in the support policy and the premium\u2011membership benefits section.",
+      "tools_used": [
+        "search_docs"
+      ],
+      "seconds": 9.81
+    },
+    {
+      "id": "q29",
+      "category": "DOCS",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "Which payment methods can I use in Nepal?",
+      "answer": "For customers in Nepal, Lumen Lane accepts the following payment methods:\n\n| Payment method | Notes |\n|----------------|-------|\n| Visa | Credit/debit card |\n| Mastercard | Credit/debit card |\n| American Express | Credit/debit card |\n| PayPal | Online payment |\n| eSewa | Local Nepali e\u2011wallet |\n\nCash on delivery is **not** accepted.  \n*(Source: \u201cPayments and Prices > Payment methods\u201d section of\u202fpayments.md)*",
+      "tools_used": [
+        "search_docs"
+      ],
+      "seconds": 9.21
+    },
+    {
+      "id": "q30",
+      "category": "DOCS",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "My mug arrived cracked. How long do I have to report it?",
+      "answer": "You can report a damaged item within **14 days of the delivery date**.  \nOpen a support ticket with the topic \u201cdamaged_item\u201d and include your order number.  \n\n*Source: Lumen Lane\u2019s \u201cDamaged Item Policy\u201d \u2013 \u201cReporting window\u201d section.*",
+      "tools_used": [
+        "search_docs"
+      ],
+      "seconds": 4.3
+    },
+    {
+      "id": "q31",
+      "category": "DOCS",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "Will I be charged in my own currency?",
+      "answer": "All orders on Lumen Lane are priced and charged in **US dollars (USD)**.  \nIf you pay with a card that is issued in another currency, the conversion to USD is handled by your bank, and any foreign\u2011transaction fee is added by them \u2013 we don\u2019t control those rates or fees.\n\n**Source:** *payments.md \u2013 \u201cPayments and Prices > Currency\u201d*",
+      "tools_used": [
+        "search_docs"
+      ],
+      "seconds": 12.27
+    },
+    {
+      "id": "q32",
+      "category": "DOCS",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "Can I still cancel my order after it has shipped?",
+      "answer": "No \u2013 once an order has shipped you can\u2019t cancel it.  \nAccording to our **Order\u2011Changes** policy:\n\n> \u201cYou can cancel an order for free while it is still *processing*.  \n>  Once an order has shipped it can\u2019t be cancelled; instead, return it under the returns policy when it arrives.\u201d  \n\n(See *order\u2011changes.md*, \u201cChanging or Cancelling an Order > Cancelling an order.\u201d)",
+      "tools_used": [
+        "search_docs"
+      ],
+      "seconds": 7.17
+    },
+    {
+      "id": "q33",
+      "category": "DB",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "How many premium customers live in Kathmandu?",
+      "answer": "There are **14 premium customers** who live in Kathmandu.  \n(Information retrieved from the shop database.)",
+      "tools_used": [
+        "query_database"
+      ],
+      "seconds": 5.84
+    },
+    {
+      "id": "q34",
+      "category": "DB",
+      "passed": false,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": false,
+      "failures": [
+        "answer is missing ['Atlas 27-inch Monitor']"
+      ],
+      "question": "What is the most expensive product in the electronics category?",
+      "answer": "The most expensive product in the **electronics** category is:\n\n| Product ID | Name | Price (USD) |\n|------------|------|-------------|\n| 9 | Atlas 27\u2011inch Monitor | **$279.00** |\n\n*Source: Query to the shop database (products table).*",
+      "tools_used": [
+        "query_database"
+      ],
+      "seconds": 9.4
+    },
+    {
+      "id": "q35",
+      "category": "DB",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "How many support tickets are still open?",
+      "answer": "There are **28 support tickets still open** in the system.",
+      "tools_used": [
+        "query_database"
+      ],
+      "seconds": 6.39
+    },
+    {
+      "id": "q36",
+      "category": "DB",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "What was the total value of delivered orders placed in March 2026?",
+      "answer": "The total value of all **delivered** orders placed in March\u202f2026 was **$5,930.94**.  \n*Source: query to the orders table in the shop database.*",
+      "tools_used": [
+        "query_database"
+      ],
+      "seconds": 6.21
+    },
+    {
+      "id": "q37",
+      "category": "DB",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "Which city has the most customers?",
+      "answer": "The city with the highest number of customers is **Kathmandu**, with **37 customers**. This information comes from the shop\u2019s customer database.",
+      "tools_used": [
+        "query_database"
+      ],
+      "seconds": 2.89
+    },
+    {
+      "id": "q38",
+      "category": "API",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "How many Canadian dollars is 100 US dollars right now?",
+      "answer": "As of the latest exchange rate (2026\u201110\u201123),\u202f$100\u202fUSD is equivalent to **$139.95\u202fCAD**.  \n\n*Source: Frankfurter API (European Central Bank reference rates).*",
+      "tools_used": [
+        "convert_currency"
+      ],
+      "seconds": 7.21
+    },
+    {
+      "id": "q39",
+      "category": "MIXED",
+      "passed": false,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": false,
+      "failures": [
+        "answer doesn't mention any of ['2 years', 'two years', '24 months', '2-year']"
+      ],
+      "question": "How much did Grace Okafor pay for her order on May 12, 2026 in Australian dollars, and how long is the warranty on it for her?",
+      "answer": "**Grace Okafor\u2019s order (ID\u202f453)**  \n- **Order total:** $79.00\u202fUSD  \n- **Converted to Australian dollars (AUD) \u2013 rate as of 2026\u201110\u201123:** 1\u202fUSD\u202f=\u202f1.424\u202fAUD  \n  - $79\u202fUSD \u00d7 1.424\u202f= **$112.50\u202fAUD** (rounded to the nearest cent)  \n\n**Warranty length**  \n- Grace is a **Premium** member (see customer plan).  \n- The warranty policy states: \u201cEvery electronics and home product we sell comes with a 1\u2011year limited warranty against manufacturing defects, starting on the delivery date. Premium members get an extra 12\u202fmonths, so their warranty lasts 2\u202fyears.\u201d  \n- Therefore, the warranty on her electronics item lasts **2\u202fyears** from the delivery date.  \n\n*Sources*  \n- Customer plan: `query_database` result \u2013 Grace Okafor is a premium member.  \n- Order total: `query_database` result \u2013 $79.00.  \n- Order items: `query_database` result \u2013 the product is in the electronics category.  \n- Warranty policy: `search_docs` result \u2013 1\u2011year base warranty + 12\u202fmonths for premium members.  \n- Currency conversion: `convert_currency` result \u2013 112.50\u202fAUD.",
+      "tools_used": [
+        "search_docs",
+        "query_database",
+        "query_database",
+        "query_database",
+        "convert_currency"
+      ],
+      "seconds": 45.26
+    },
+    {
+      "id": "q40",
+      "category": "MIXED",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "How many open delivery tickets does Bikash Tamang have, and what does the shipping policy say to do about a delayed order?",
+      "answer": "**Open delivery tickets for Bikash Tamang**\n\n- Bikash Tamang has **2 open support tickets** with the topic \u201cdelivery\u201d.\n\n  *Source: query to the `support_tickets` table (see database result above).*\n\n**Shipping policy for a delayed order**\n\n- The Shipping Policy states that an order is considered delayed if it remains in the \u201cprocessing\u201d status for **more than 2 business days** after being placed.  \n- In that case, the policy instructs customers to **open a support ticket with the topic \u201cdelivery\u201d** so the team can investigate the delay.\n\n  *Source: \u201cShipping Policy > Processing time\u201d section of `shipping.md` (see search result).*\n\nLet me know if you need any further details!",
+      "tools_used": [
+        "query_database",
+        "search_docs"
+      ],
+      "seconds": 15.22
+    },
+    {
+      "id": "q41",
+      "category": "NONE",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "Who is the CEO of Lumen Lane?",
+      "answer": "I couldn\u2019t find any mention of a CEO in Lumen Lane\u2019s policy documents. The available policy files (returns, payments, premium membership, support, etc.) do not contain that information. If you need the name of the CEO, it may be listed elsewhere (e.g., on the company\u2019s website or in a corporate filing) rather than in the shop\u2019s internal documents.",
+      "tools_used": [
+        "search_docs"
+      ],
+      "seconds": 12.54
+    }
+  ]
+}
