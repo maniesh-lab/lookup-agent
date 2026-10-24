@@ -30,7 +30,8 @@ First full version.
 
 ### Changed
 - Coverage is uploaded to Codecov on every push; the README badge shows it.
+- `docker compose up --build` checked end to end on 2026-10-24 (a MIXED question answered with the database and the currency API).
 - Steadfast now installs from PyPI (`steadfast-llm` 0.3.0) instead of from GitHub, so the Docker image no longer needs git.
 
 ### Not done yet
-- Full `docker compose up --build` check, live deploy or demo GIF
+- Live deploy or demo GIF
