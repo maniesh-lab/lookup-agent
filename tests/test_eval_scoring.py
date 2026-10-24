@@ -3,7 +3,14 @@
 import json
 from pathlib import Path
 
-from eval.scoring import extract_numbers, is_refusal, mentions_number, score_case
+from eval.scoring import (
+    extract_numbers,
+    is_refusal,
+    mentions_name,
+    mentions_number,
+    normalize,
+    score_case,
+)
 
 TEST_SET = Path(__file__).resolve().parent.parent / "eval" / "test_set.json"
 
@@ -71,3 +78,19 @@ def test_test_set_is_well_formed():
         assert set(c["expected_tools"]) <= tools, c["id"]
         has_check = c.get("must_mention") or c.get("truth") or c.get("fx") or c.get("expect_refusal")
         assert has_check, f"{c['id']} has no answer check"
+
+
+def test_lookalike_characters_are_normalized():
+    # Real answers from the 2026-10-24 run: a non-breaking hyphen, narrow
+    # no-break spaces inside a name, and as a thousands separator.
+    assert mentions_name("**Orbit USB‑C Hub** - 25 units", "Orbit USB-C Hub")
+    assert mentions_name("| Grace Okafor | 159 |", "Grace Okafor")
+    assert mentions_number("250 EUR = 26 568.00 INR", 26568.0)
+    assert not mentions_number("on 2026‑10‑23", 26568.0)
+    assert "14-day" in normalize("a 14‑day free trial")
+    assert is_refusal("the shop’s records don’t keep track of which employee packed it")
+
+
+def test_thousands_join_needs_exactly_three_digits():
+    assert normalize("June 30 2026") == "June 30 2026"
+    assert normalize("1 234 567") == "1234567"

@@ -43,6 +43,15 @@ REFUSAL_PHRASES = [
     "not tracked",
     "isn't tracked",
     "no record",
+    "don't record",
+    "do not record",
+    "doesn't record",
+    "does not record",
+    "not recorded",
+    "don't keep track",
+    "do not keep track",
+    "doesn't keep track",
+    "does not keep track",
     "can't find",
     "cannot find",
     "couldn't find",
@@ -58,10 +67,25 @@ REFUSAL_PHRASES = [
 
 NUMBER = re.compile(r"(?<![\w.])-?\d[\d,]*(?:\.\d+)?")
 
+# Models often write special Unicode characters that look like normal ones:
+# a non-breaking hyphen in "USB‑C", a narrow no-break space in "Grace Okafor"
+# or as a thousands separator in "26 568". They are turned into their plain
+# versions before any check, so a correct answer isn't failed over a lookalike.
+HYPHENS = dict.fromkeys(map(ord, "‐‑‒–−"), "-")
+SPACES = "    "
+QUOTES = {ord("‘"): "'", ord("’"): "'", ord("“"): '"', ord("”"): '"'}
+THOUSANDS_SPACE = re.compile(rf"(?<=\d)[{SPACES}](?=\d{{3}}(?!\d))")
+
+
+def normalize(text: str) -> str:
+    text = THOUSANDS_SPACE.sub("", text)  # "26 568" -> "26568"
+    text = re.sub(f"[{SPACES}]", " ", text)
+    return text.translate(HYPHENS).translate(QUOTES)
+
 
 def extract_numbers(text: str) -> list[float]:
     numbers = []
-    for raw in NUMBER.findall(text):
+    for raw in NUMBER.findall(normalize(text)):
         cleaned = raw.replace(",", "")
         try:
             numbers.append(float(cleaned))
@@ -78,7 +102,7 @@ def mentions_number(text: str, expected: float, rel_tol: float = 0.005, abs_tol:
 
 
 def mentions(text: str, phrase: str) -> bool:
-    return phrase.lower() in text.lower()
+    return normalize(phrase).lower() in normalize(text).lower()
 
 
 def mentions_name(text: str, name: str) -> bool:
@@ -89,7 +113,7 @@ def mentions_name(text: str, name: str) -> bool:
 
 
 def is_refusal(text: str) -> bool:
-    lowered = text.lower().replace("’", "'")
+    lowered = normalize(text).lower()
     return any(p in lowered for p in REFUSAL_PHRASES)
 
 
