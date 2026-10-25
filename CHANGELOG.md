@@ -60,5 +60,8 @@ First full version.
 - The agent converted one order with `convert_currency` and worked out a second one itself, 2 cents off ($58.00 became €51.84 instead of €51.82). Prompt v2 now says to never do arithmetic and to convert every amount with its own call.
 - "Which product sold the most?" counted cancelled orders. Prompt v2 now treats "sold", "sales" and "revenue" as non-cancelled orders unless the user says otherwise, and tells the agent to mention it.
 
+### Results with the current prompt (2026-10-25)
+- Prompt v2 re-run with its new rules: 40/41 on the main set (gpt-oss-20b) and 15/15 on the hard set (gpt-oss-120b), both on Groq's free tier. The one miss (q28) said support reply times aren't stored instead of checking the support policy; the same question passed in the previous run. README tables updated.
+
 ### Not done yet
 - Live deploy

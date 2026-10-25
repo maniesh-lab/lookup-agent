@@ -45,43 +45,44 @@ The agent loops between the LLM and the tools until it has an answer, with a ste
 | Hybrid (vector + keyword, RRF) | 100% (26/26) | 0.97 |
 | Hybrid + reranker | 100% (26/26) | 0.96 |
 
-**Agent** (`python -m eval.run_eval`, scored by rules, see `eval/scoring.py`), measured on 2026-10-24 with `openai/gpt-oss-20b` on Groq (free tier), 41 questions per run, one run per prompt version:
+**Agent** (`python -m eval.run_eval`, scored by rules, see `eval/scoring.py`), measured with `openai/gpt-oss-20b`, a small model on Groq's free tier, 41 questions per run, one run per prompt version (v1 on 2026-10-24, v2 with its current rules on 2026-10-25):
 
 | | Prompt v1 | Prompt v2 |
 |---|---|---|
-| Passed | 41/41 | 41/41 |
-| Picked the right tools | 41/41 | 41/41 |
-| Tool calls, total | 59 | 52 |
+| Passed | 41/41 | 40/41 |
+| Picked the right tools | 41/41 | 40/41 |
+| Tool calls, total | 59 | 50 |
 | Tool calls on unanswerable (NONE) questions | 7 | 1 |
-| Median answer length | 349 characters | 189 characters |
-| Tokens used | 117,683 | 136,198 |
+| Median answer length | 349 characters | 256 characters |
+| Tokens used | 117,683 | 144,537 |
 
 How to read this:
 
-- **Both prompts pass every rule-based check, so this test set can't tell them apart.** The first scoring pass reported 78% (v1) and 80% (v2), but almost every failure was the scorer's fault: the model writes lookalike characters (a non-breaking hyphen in "USB‑C", narrow spaces in "26 568"). After fixing the scorer, both saved runs were re-scored without new AI calls (`python -m eval.rescore`).
+- **The rule-based checks barely separate the prompts on this set.** The first scoring pass of the first runs reported 78% (v1) and 80% (v2), but almost every failure was the scorer's fault: the model writes lookalike characters (a non-breaking hyphen in "USB‑C", narrow spaces in "26 568"). After fixing the scorer, those runs were re-scored without new AI calls (`python -m eval.rescore`) and both passed 41/41.
+- **v2's one miss (q28):** asked how fast premium members get a support reply, it said reply times aren't stored instead of checking the support policy (12 hours). The same question passed in v2's previous run, so this is run-to-run variation in a small free model rather than a gap in the prompt.
 - **The real differences only show up when reading the answers.** With v1 the agent searched the documents 7 times for data that doesn't exist (4 searches for stock levels alone), said the April refund tickets were "still open" when they're closed, assumed a delivery date it didn't have, and offered to "open a support ticket", which it can't do. v2 answered unanswerable questions without searching, gave shorter answers with a sources line, and said when it couldn't work something out.
-- **v2 costs about 16% more tokens**, because its system prompt is longer and is sent with every call.
+- **v2 costs about 23% more tokens**, because its system prompt is longer and is sent with every call.
 - **Search is saturated too.** With nine short documents on clearly different topics, plain vector search already finds the right file every time; hybrid search and the reranker only shuffle the order slightly. They would matter on a bigger or messier document set.
 - **Small sample**: one run per prompt, one model.
 
-**Harder questions** (`python -m eval.run_eval --set hard`, 15 questions, measured on 2026-10-24 with `openai/gpt-oss-120b` on Groq):
+**Harder questions** (`python -m eval.run_eval --set hard`, 15 questions, measured with `openai/gpt-oss-120b`, the larger model on Groq's free tier; v1 on 2026-10-24, v2 with its current rules on 2026-10-25):
 
 | | Prompt v1 | Prompt v2 |
 |---|---|---|
-| Passed | 12/15 | 14/15 |
+| Passed | 12/15 | 15/15 |
 | TRAP (data that doesn't exist) | 4/5 | 5/5 |
 | SAFETY (asked to delete or refund) | 2/2 | 2/2 |
 | FOLLOWUP (needs the earlier messages) | 2/2 | 2/2 |
 | PARTIAL (half answerable) | 1/2 | 2/2 |
-| REASONING (ties, thresholds, dates) | 3/4 | 3/4 |
-| Tool calls, total | 30 | 18 |
+| REASONING (ties, thresholds, dates) | 3/4 | 4/4 |
+| Tool calls, total | 30 | 17 |
 
 - **Here the prompts do differ.** With v1 the agent made 6 tool calls looking for a customer who doesn't exist (and searched the policy documents for her), and answered "which staff member handles each ticket" with a long ticket table without saying staff aren't stored. v2 handled both.
-- **Both missed a tie.** Three products sold 25 units each; the agent's SQL used `LIMIT 1` and named only one.
-- These numbers are after re-scoring: the first pass marked two correct "there's no toys category" answers as wrong because of their wording, and the scorer's phrase list was extended.
+- **The tie.** Three products sold 25 units each. v1, like v2 before its tie rule, used `LIMIT 1` in its SQL and named only one; v2 now names all three.
+- The v1 numbers are after re-scoring: the first pass marked a correct "there's no toys category" answer as wrong because of its wording, and the scorer's phrase list was extended.
 - Run on the 120b model because the 20b model's free daily token limit was used up that day, so these are not directly comparable with the 41-question runs above.
 
-**What the evals changed.** These runs led to three more rules in prompt v2: check for ties instead of using `LIMIT 1`, convert every amount with the currency tool instead of doing the maths, and leave cancelled orders out of "sold". With the new prompt the tie question (h10) passes, naming all three products, and the demo above shows the tie and cancelled-order rules in action.
+**What the evals changed.** These runs led to three more rules in prompt v2: check for ties instead of using `LIMIT 1`, convert every amount with the currency tool instead of doing the maths, and leave cancelled orders out of "sold". With them v2 went from 14/15 to 15/15 on the hard set, and the demo above shows the tie and cancelled-order rules in action.
 
 Every answer from every run, with its score, is saved in [`eval/results/`](eval/results/) (`summary.md` and `summary-hard.md` list the runs).
 
