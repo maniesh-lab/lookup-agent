@@ -41,6 +41,10 @@ First full version.
 - `eval/rescore.py` prints the right summary file name for the hard set.
 - Langfuse tracing checked with a real account: each chat turn shows its LLM and tool steps with timings and the prompt version. Screenshot in the README.
 
+### Fixed (found while recording the demo, 2026-10-25)
+- The agent converted one order with `convert_currency` and worked out a second one itself, 2 cents off ($58.00 became €51.84 instead of €51.82). Prompt v2 now says to never do arithmetic and to convert every amount with its own call.
+- "Which product sold the most?" counted cancelled orders. Prompt v2 now treats "sold", "sales" and "revenue" as non-cancelled orders unless the user says otherwise, and says so in the answer.
+
 ### Added (chat page)
 - A chat page at `/` (`app/static/index.html`): suggested questions, conversation memory, a "checked" trail showing which sources each answer used, sources with the SQL, light and dark mode, works on mobile.
 - A stop button (and Esc) on the chat page. `/chat` cancels the agent when the caller hangs up (returns 499), and unfinished tool steps from a stopped run are dropped before the next LLM call, so the conversation keeps working.
