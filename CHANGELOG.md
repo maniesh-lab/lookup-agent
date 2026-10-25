@@ -41,6 +41,9 @@ First full version.
 - `eval/rescore.py` prints the right summary file name for the hard set.
 - Langfuse tracing checked with a real account: each chat turn shows its LLM and tool steps with timings and the prompt version. Screenshot in the README.
 
+### Added (2026-10-25)
+- Demo GIF of the chat page at the top of the README.
+
 ### Fixed (found while recording the demo, 2026-10-25)
 - The agent converted one order with `convert_currency` and worked out a second one itself, 2 cents off ($58.00 became €51.84 instead of €51.82). Prompt v2 now says to never do arithmetic and to convert every amount with its own call.
 - "Which product sold the most?" counted cancelled orders. Prompt v2 now treats "sold", "sales" and "revenue" as non-cancelled orders unless the user says otherwise, and says so in the answer.
@@ -56,4 +59,4 @@ First full version.
 - Steadfast now installs from PyPI (`steadfast-llm` 0.3.0) instead of from GitHub, so the Docker image no longer needs git.
 
 ### Not done yet
-- Live deploy or demo GIF
+- Live deploy

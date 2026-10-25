@@ -5,6 +5,8 @@
 
 **A chatbot that looks things up before it answers.**
 
+<p align="center"><img src="docs/images/demo.gif" alt="The chat page answering a policy question, an order total in euros, and a best-seller question with a three-way tie, each with its sources" width="600"></p>
+
 Most business questions don't live in one place. "What did Priya's February order cost in Canadian dollars?" needs the order database *and* a live exchange rate. "Which premium customers asked for refunds in April, and what does the refund policy say about premium members?" needs the database *and* the policy documents. A plain chatbot guesses. lookup-agent checks.
 
 It has three tools and picks the right ones for each question:
