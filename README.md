@@ -37,9 +37,7 @@ The agent loops between the LLM and the tools until it has an answer, with a ste
 
 ## Results
 
-Measured on 2026-10-24 with `openai/gpt-oss-20b` on Groq (free tier), 41 questions per run, one run per prompt version.
-
-**Search** (26 queries, `python -m eval.run_retrieval_eval`):
+**Search** (26 queries, `python -m eval.run_retrieval_eval`, no LLM involved):
 
 | Layer | Hit rate @5 | MRR |
 |---|---|---|
@@ -47,7 +45,7 @@ Measured on 2026-10-24 with `openai/gpt-oss-20b` on Groq (free tier), 41 questio
 | Hybrid (vector + keyword, RRF) | 100% (26/26) | 0.97 |
 | Hybrid + reranker | 100% (26/26) | 0.96 |
 
-**Agent** (`python -m eval.run_eval`, scored by rules, see `eval/scoring.py`):
+**Agent** (`python -m eval.run_eval`, scored by rules, see `eval/scoring.py`), measured on 2026-10-24 with `openai/gpt-oss-20b` on Groq (free tier), 41 questions per run, one run per prompt version:
 
 | | Prompt v1 | Prompt v2 |
 |---|---|---|
@@ -79,9 +77,11 @@ How to read this:
 | Tool calls, total | 30 | 18 |
 
 - **Here the prompts do differ.** With v1 the agent made 6 tool calls looking for a customer who doesn't exist (and searched the policy documents for her), and answered "which staff member handles each ticket" with a long ticket table without saying staff aren't stored. v2 handled both.
-- **Both missed a tie.** Three products sold 25 units each; the agent's SQL used `LIMIT 1` and named only one. After adding a rule about ties to v2, a re-run of that question passed: the agent fetched the top 5 rows and named all three products as tied (one question, one run).
+- **Both missed a tie.** Three products sold 25 units each; the agent's SQL used `LIMIT 1` and named only one.
 - These numbers are after re-scoring: the first pass marked two correct "there's no toys category" answers as wrong because of their wording, and the scorer's phrase list was extended.
 - Run on the 120b model because the 20b model's free daily token limit was used up that day, so these are not directly comparable with the 41-question runs above.
+
+**What the evals changed.** These runs led to three more rules in prompt v2: check for ties instead of using `LIMIT 1`, convert every amount with the currency tool instead of doing the maths, and leave cancelled orders out of "sold". With the new prompt the tie question (h10) passes, naming all three products, and the demo above shows the tie and cancelled-order rules in action.
 
 Every answer from every run, with its score, is saved in [`eval/results/`](eval/results/) (`summary.md` and `summary-hard.md` list the runs).
 
@@ -178,6 +178,7 @@ In this trace the document search took 7.8 s of the 9.1 s total, while both LLM 
 pytest                       # unit tests: fake LLM, fake search models, no API key needed
 TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/lookup_test pytest   # plus database tests
 ruff check .
+ruff format --check .
 ```
 
 The integration tests rebuild the tables in the database you point them at, so use a separate one. Create it once with `docker compose exec postgres createdb -U postgres lookup_test`. CI runs lint and both test groups against a real pgvector Postgres on every push.

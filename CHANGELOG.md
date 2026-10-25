@@ -23,13 +23,23 @@ First full version.
 - Refusal detection now also accepts "doesn't record" / "don't keep track" wording.
 - `/chat` replies leave out empty source fields instead of sending them as `null`.
 
-### Added (after the first real eval run)
+### Added (after the first real eval run, 2026-10-24)
 - `eval/rescore.py`: score a saved run again without new AI calls, using the exchange rates of the run's day.
 - Eval results now save each answer's sources, the expected values and the rate date, so later re-scoring is exact.
 - `convert()` takes an optional `on_date` for historical rates.
 - First measured results in the README.
 
-### Added (harder evals)
+### Changed (2026-10-24)
+- Coverage is uploaded to Codecov on every push; the README badge shows it.
+- `docker compose up --build` checked end to end on 2026-10-24 (a MIXED question answered with the database and the currency API).
+- Steadfast now installs from PyPI (`steadfast-llm` 0.3.0) instead of from GitHub, so the Docker image no longer needs git.
+
+### Added: chat page (2026-10-24)
+- A chat page at `/` (`app/static/index.html`): suggested questions, conversation memory, a "checked" trail showing which sources each answer used, sources with the SQL, light and dark mode, works on mobile.
+- A stop button (and Esc) on the chat page. `/chat` cancels the agent when the caller hangs up (returns 499), and unfinished tool steps from a stopped run are dropped before the next LLM call, so the conversation keeps working.
+- The request-id middleware is now plain ASGI, so endpoints can see client disconnects.
+
+### Added: harder evals (2026-10-24)
 - `eval/hard_set.json`: 15 harder questions in five groups (TRAP, SAFETY, FOLLOWUP, PARTIAL, REASONING); run with `--set hard`.
 - Two new scoring checks: `must_not_mention` (e.g. "has been deleted") and `max_tool_calls`.
 - Eval cases can have earlier `turns` in the same conversation, to test memory.
@@ -39,6 +49,8 @@ First full version.
 - Scorer: more "not found" wordings accepted for h01 and h15; h15 no longer requires a database query, because the category list is in the tool description.
 - Prompt v2 gained a rule: for "most / least / top" questions, check for ties instead of using `LIMIT 1` (both prompts missed a three-way tie on h10). A re-run of h10 with the rule passed.
 - `eval/rescore.py` prints the right summary file name for the hard set.
+
+### Tracing checked (2026-10-24)
 - Langfuse tracing checked with a real account: each chat turn shows its LLM and tool steps with timings and the prompt version. Screenshot in the README.
 
 ### Added (2026-10-25)
@@ -46,17 +58,7 @@ First full version.
 
 ### Fixed (found while recording the demo, 2026-10-25)
 - The agent converted one order with `convert_currency` and worked out a second one itself, 2 cents off ($58.00 became €51.84 instead of €51.82). Prompt v2 now says to never do arithmetic and to convert every amount with its own call.
-- "Which product sold the most?" counted cancelled orders. Prompt v2 now treats "sold", "sales" and "revenue" as non-cancelled orders unless the user says otherwise, and says so in the answer.
-
-### Added (chat page)
-- A chat page at `/` (`app/static/index.html`): suggested questions, conversation memory, a "checked" trail showing which sources each answer used, sources with the SQL, light and dark mode, works on mobile.
-- A stop button (and Esc) on the chat page. `/chat` cancels the agent when the caller hangs up (returns 499), and unfinished tool steps from a stopped run are dropped before the next LLM call, so the conversation keeps working.
-- The request-id middleware is now plain ASGI, so endpoints can see client disconnects.
-
-### Changed
-- Coverage is uploaded to Codecov on every push; the README badge shows it.
-- `docker compose up --build` checked end to end on 2026-10-24 (a MIXED question answered with the database and the currency API).
-- Steadfast now installs from PyPI (`steadfast-llm` 0.3.0) instead of from GitHub, so the Docker image no longer needs git.
+- "Which product sold the most?" counted cancelled orders. Prompt v2 now treats "sold", "sales" and "revenue" as non-cancelled orders unless the user says otherwise, and tells the agent to mention it.
 
 ### Not done yet
 - Live deploy
