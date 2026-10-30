@@ -75,7 +75,7 @@ Built on [Steadfast](https://github.com/maniesh-lab/steadfast), a reliability la
 
 ### Data (`db/`)
 
-`db/schema.sql` creates the tables, indexes and the read-only role. `db/seed.py` fills them with a fake shop: about 160 customers, 34 products, 460 orders and 80 support tickets between January and June 2026. Every random choice comes from one seeded generator and the name lists live in the file, so every run produces the same rows (it prints a fingerprint to prove it). A few cases are planted on purpose because the eval asks about them.
+`db/schema.sql` creates the tables, indexes and the read-only role. `db/seed.py` fills them with a fake shop: 159 customers, 34 products, 457 orders (754 order items) and 81 support tickets between January and June 2026. Every random choice comes from one seeded generator and the name lists live in the file, so every run produces the same rows (it prints a fingerprint to prove it). A few cases are planted on purpose because the eval asks about them.
 
 ### Evals (`eval/`)
 

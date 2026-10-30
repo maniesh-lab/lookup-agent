@@ -106,7 +106,7 @@ The first start builds the database (tables, fake shop data, policy search index
 {"message": "What was the total of the order Priya Sharma placed on February 18, 2026, in Canadian dollars at today's rate?"}
 ```
 
-The reply has `answer`, `sources`, `tools_used` and a `thread_id`. Send the `thread_id` back with your next message to continue the same conversation. The chat page uses this same endpoint, so anything it does, another website, app or bot can do too.
+The reply has `answer`, `sources`, `tools_used`, `steps`, `prompt_version` and a `thread_id`. Send the `thread_id` back with your next message to continue the same conversation. The chat page uses this same endpoint, so anything it does, another website, app or bot can do too.
 
 ## Run it without Docker (for development)
 
@@ -182,13 +182,14 @@ ruff check .
 ruff format --check .
 ```
 
-The integration tests rebuild the tables in the database you point them at, so use a separate one. Create it once with `docker compose exec postgres createdb -U postgres lookup_test`. CI runs lint and both test groups against a real pgvector Postgres on every push.
+The integration tests rebuild the tables in the database you point them at, so use a separate one. Create it once with `docker compose exec postgres createdb -U postgres lookup_test`. CI runs lint and both test groups against a real pgvector Postgres on every push to `main` and every pull request.
 
 ## Project structure
 
 ```
 app/
   main.py              FastAPI app: /, /health, /chat, /ingest, correlation ids
+  db.py                Postgres connection helpers (owner and read-only user)
   static/index.html    the chat page (one file, no build step)
   agent/               LangGraph graph, runner (answer + sources), prompts/v1.txt, v2.txt
   tools/               search_docs, query_database, convert_currency, registry
@@ -206,7 +207,7 @@ CHANGELOG.md           what was built and changed
 
 ## Settings
 
-All settings come from `.env` (see `.env.example`). The main ones: `LLM_PROVIDER` (`groq` or `openai`, the other one becomes the fallback when its key is set), `LLM_MODEL`, `PROMPT_VERSION`, `MAX_AGENT_STEPS`, `SEARCH_MODE` (`vector`, `hybrid` or `rerank`), and the optional Langfuse keys for tracing. Less common settings (SQL timeout and row limit, search models, rate limit, temperature) have defaults in `app/core/config.py` and can be overridden the same way.
+All settings come from `.env` (see `.env.example`). The main ones: `LLM_PROVIDER` (`groq` or `openai`, the other one becomes the fallback when its key is set), `LLM_MODEL` (the Groq model; with `LLM_PROVIDER=openai` the model is `OPENAI_MODEL`), `PROMPT_VERSION`, `MAX_AGENT_STEPS`, `SEARCH_MODE` (`vector`, `hybrid` or `rerank`), and the optional Langfuse keys for tracing. Less common settings (SQL timeout and row limit, search models, rate limit, temperature) have defaults in `app/core/config.py` and can be overridden the same way.
 
 ## Known limitations
 
@@ -214,6 +215,9 @@ All settings come from `.env` (see `.env.example`). The main ones: `LLM_PROVIDER
 - The fake shop data covers January to June 2026 only, and all prices are in USD.
 - Eval answer checks are simple text rules (a number, names or key phrases must appear). They can miss a correct answer worded in an unexpected way (this happened twice on the hard set), and they don't catch an extra wrong claim inside an otherwise correct answer.
 - Each result comes from one run of one model. The hard set is only 15 questions, so one question is about 7 points.
+- Long conversations grow until they hit the model's token limit: every earlier message and tool result in a thread is sent again with each question.
+- The eval's "must not mention" checks are plain text matches, so a correct refusal like "no orders were deleted" can fail on "were deleted".
+- `/chat` has no auth or rate limit, so don't expose it publicly without adding them.
 
 ## License
 

@@ -63,5 +63,17 @@ First full version.
 ### Results with the current prompt (2026-10-25)
 - Prompt v2 re-run with its new rules: 40/41 on the main set (gpt-oss-20b) and 15/15 on the hard set (gpt-oss-120b), both on Groq's free tier. The one miss (q28) said support reply times aren't stored instead of checking the support policy; the same question passed in the previous run. README tables updated.
 
+### Fixed (review pass, 2026-10-30)
+- The SQL tool read the whole result into memory before applying the row limit. It now uses a server-side cursor, so only the rows it returns are fetched, and text values over 2,000 characters are cut.
+- The SQL check misread `E'\''` strings (which could hide a keyword after them), rejected `;` inside string literals, and allowed `SELECT ... INTO`. Writes were still blocked by the read-only user.
+- Conversation memory used one Postgres connection that never reconnected, so after a database restart every `/chat` failed until the app was restarted. It now uses a connection pool that checks connections before use.
+- A crash inside a request returned a 500 without the `X-Request-ID` header. Caller-supplied request ids are now capped at 128 characters.
+- Log lines from httpx and uvicorn were plain text without the correlation id; they now go through the same JSON format.
+- A wrong `PROMPT_VERSION` now stops the app at startup instead of failing every question.
+- `setup_db --if-empty` now checks that the seed finished, not only that the tables exist, so an interrupted first start is repaired on the next one. The reranker model is downloaded during setup instead of during the first question.
+- Docker: the Postgres healthcheck checks over TCP (the image's first-start server only listens on a socket), Postgres is published on 127.0.0.1 only, and the app container restarts if it exits.
+- The eval scorer counted the digits of dates ("2026-02-18") as numbers in answers. Re-checked offline: no saved result changes.
+- Removed the unused `embedding_dim` setting.
+
 ### Not done yet
 - Live deploy
