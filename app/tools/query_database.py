@@ -6,6 +6,8 @@ Safety comes in layers, so one mistake doesn't open a hole:
    tables (see db/schema.sql).
 3. The transaction is read-only and has a statement timeout.
 4. At most sql_row_limit rows come back; the result says if it was cut.
+   A server-side cursor fetches only those rows, so a huge result never
+   reaches the app, and very long values are shortened.
 
 Errors are returned to the model as text instead of raised, so it can
 read the Postgres error and fix its query.
@@ -46,9 +48,12 @@ DESCRIPTION = (
 
 FORBIDDEN = re.compile(
     r"\b(insert|update|delete|drop|alter|create|truncate|grant|revoke|copy|call|do|"
-    r"vacuum|analyze|lock|set|reset|comment|refresh|listen|notify)\b",
+    r"vacuum|analyze|lock|set|reset|comment|refresh|listen|notify|into)\b",
     re.IGNORECASE,
 )
+# E'...' strings allow backslash escapes (E'\''), so they're matched before plain ones.
+STRING_LITERAL = re.compile(r"(?<!\w)[eE]'(?:[^'\\]|\\.|'')*'|'(?:[^']|'')*'")
+MAX_CELL_CHARS = 2000  # longer text values are cut so one cell can't flood the conversation
 
 
 class QueryDatabaseArgs(BaseModel):
@@ -64,9 +69,9 @@ def check_sql(sql: str) -> str:
     cleaned = sql.strip().rstrip(";").strip()
     if not cleaned:
         raise UnsafeQuery("The query is empty.")
-    if ";" in cleaned:
+    no_strings = STRING_LITERAL.sub("''", cleaned)  # ignore words and ';' inside string literals
+    if ";" in no_strings:
         raise UnsafeQuery("Only one statement is allowed (remove the extra ';').")
-    no_strings = re.sub(r"'(?:[^']|'')*'", "''", cleaned)  # ignore words inside string literals
     if not re.match(r"^\s*(select|with)\b", no_strings, re.IGNORECASE):
         raise UnsafeQuery("Only SELECT queries are allowed.")
     bad = FORBIDDEN.search(no_strings)
@@ -76,6 +81,8 @@ def check_sql(sql: str) -> str:
 
 
 def _jsonable(value):
+    if isinstance(value, str) and len(value) > MAX_CELL_CHARS:
+        return value[:MAX_CELL_CHARS] + f"... (cut, {len(value)} characters in total)"
     if isinstance(value, Decimal):
         return float(value)
     if isinstance(value, (date, datetime)):
@@ -93,7 +100,8 @@ def run_query(sql: str, *, conn=None, row_limit: int | None = None) -> dict:
     own_conn = conn is None
     try:
         conn = conn or connect_readonly()
-        with conn.cursor() as cur:
+        # A named (server-side) cursor: rows stay in Postgres until fetched.
+        with conn.cursor(name="agent_query") as cur:
             cur.execute(cleaned)
             columns = [c.name for c in cur.description]
             rows = cur.fetchmany(row_limit + 1)

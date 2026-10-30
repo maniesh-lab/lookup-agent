@@ -151,6 +151,12 @@ def test_row_limit_and_timeout(readonly):
     assert "stopped" in qd.run_query("SELECT pg_sleep(3)", conn=readonly)["error"]
 
 
+def test_long_values_are_cut(readonly):
+    result = qd.run_query("SELECT repeat('x', 100000) AS big", conn=readonly)
+    cell = result["rows"][0][0]
+    assert len(cell) < 2100 and "100000 characters in total" in cell
+
+
 def test_schema_guide_matches_the_database(db):
     with db.cursor() as cur:
         cur.execute(
