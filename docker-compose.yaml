@@ -7,11 +7,12 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: lookup_db
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"   # only reachable from this machine
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d lookup_db"]
+      # -h: check over TCP like the app does; the image's first-start init server only listens on a socket
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d lookup_db"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -25,6 +26,7 @@ services:
       READONLY_DATABASE_URL: postgresql://lookup_reader:lookup_reader@postgres:5432/lookup_db
     ports:
       - "8000:8000"
+    restart: unless-stopped
     volumes:
       - models:/models   # downloaded embedding/reranker models survive rebuilds
     depends_on:
