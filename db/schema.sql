@@ -82,7 +82,7 @@ CREATE TABLE chunks (
     chunk_index  INTEGER NOT NULL,
     heading      TEXT    NOT NULL,
     content      TEXT    NOT NULL,
-    embedding    vector(384) NOT NULL,           -- must match EMBEDDING_DIM
+    embedding    vector(384) NOT NULL,           -- bge-small's size; change it with EMBEDDING_MODEL
     tsv          tsvector GENERATED ALWAYS AS (
                      to_tsvector('english', heading || ' ' || content)
                  ) STORED,

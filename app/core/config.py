@@ -28,7 +28,6 @@ class Settings(BaseSettings):
 
     # Search
     embedding_model: str = "BAAI/bge-small-en-v1.5"
-    embedding_dim: int = 384  # must match vector(384) in db/schema.sql
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     search_mode: str = "rerank"  # "vector", "hybrid" or "rerank"
     search_top_k: int = 5
