@@ -1,4 +1,5 @@
 from app.agent.graph import build_graph
+from app.agent.prompts import load_prompt
 from app.agent.runner import Agent, ChatResult
 from app.core.config import settings
 
@@ -14,6 +15,7 @@ def create_agent(*, checkpointer=None, llm=None, registry=None, prompt_version=N
 
         registry = default_registry()
     version = prompt_version or settings.prompt_version
+    load_prompt(version)  # fail at startup, not at the first question, if the version is wrong
     graph = build_graph(
         llm,
         registry,

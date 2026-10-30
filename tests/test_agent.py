@@ -6,6 +6,7 @@ import pytest
 from langgraph.checkpoint.memory import InMemorySaver
 from pydantic import BaseModel
 
+from app.agent import create_agent
 from app.agent.graph import STEP_LIMIT_NOTE, build_graph
 from app.agent.runner import NO_ANSWER, Agent
 from app.tools.registry import Tool, ToolRegistry
@@ -187,6 +188,11 @@ async def test_prompt_version_is_used(version):
     system = llm.calls[0]["messages"][0]["content"]
     assert ("Pick the right source" in system) == (version == "v2")
     assert result.prompt_version == version
+
+
+def test_unknown_prompt_version_fails_at_startup():
+    with pytest.raises(ValueError, match="Unknown prompt version 'v9'"):
+        create_agent(llm=FakeLLM([]), registry=fake_registry([]), prompt_version="v9")
 
 
 # --- Stopped turns -------------------------------------------------------------
