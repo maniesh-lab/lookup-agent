@@ -28,10 +28,23 @@ async def lifespan(app: FastAPI):
     """Runs once when the server starts (before `yield`) and once when it stops."""
     configure_logging(settings.log_level)
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+    from psycopg.rows import dict_row
+    from psycopg_pool import AsyncConnectionPool
 
     # The checkpointer saves each conversation's messages in Postgres, so a
-    # thread_id keeps its memory across requests and server restarts.
-    async with AsyncPostgresSaver.from_conn_string(plain_url(settings.database_url)) as saver:
+    # thread_id keeps its memory across requests and server restarts. A pool
+    # that checks each connection before use means a Postgres restart costs
+    # one reconnect instead of breaking every later request.
+    pool = AsyncConnectionPool(
+        plain_url(settings.database_url),
+        min_size=1,
+        max_size=5,
+        kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
+        check=AsyncConnectionPool.check_connection,
+        open=False,
+    )
+    async with pool:
+        saver = AsyncPostgresSaver(pool)
         await saver.setup()
         app.state.agent = create_agent(checkpointer=saver)
         log.info(
@@ -52,6 +65,9 @@ app = FastAPI(
 )
 
 
+MAX_REQUEST_ID_CHARS = 128
+
+
 class CorrelationIdMiddleware:
     """Give every request an id, put it on every log line, and return it in a header.
 
@@ -69,16 +85,18 @@ class CorrelationIdMiddleware:
             return
 
         headers = dict(scope.get("headers") or [])
-        correlation_id = headers.get(b"x-request-id", b"").decode() or str(uuid.uuid4())
+        given = headers.get(b"x-request-id", b"").decode("ascii", errors="replace")[:MAX_REQUEST_ID_CHARS]
+        correlation_id = given or str(uuid.uuid4())
         structlog.contextvars.clear_contextvars()
         structlog.contextvars.bind_contextvars(correlation_id=correlation_id)
         start = time.perf_counter()
         status = 500
+        started = False
 
         async def send_with_id(message):
-            nonlocal status
+            nonlocal status, started
             if message["type"] == "http.response.start":
-                status = message["status"]
+                status, started = message["status"], True
                 message = {
                     **message,
                     "headers": [*message.get("headers", []), (b"x-request-id", correlation_id.encode())],
@@ -89,7 +107,17 @@ class CorrelationIdMiddleware:
             await self.app(scope, receive, send_with_id)
         except Exception:
             log.exception("request_failed", method=scope["method"], path=scope["path"])
-            raise
+            if started:
+                raise
+            # Answer the 500 here, so it carries the request id like every other response.
+            await send_with_id(
+                {
+                    "type": "http.response.start",
+                    "status": 500,
+                    "headers": [(b"content-type", b"text/plain; charset=utf-8")],
+                }
+            )
+            await send({"type": "http.response.body", "body": b"Internal Server Error"})
         log.info(
             "request",
             method=scope["method"],

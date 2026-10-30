@@ -68,6 +68,8 @@ REFUSAL_PHRASES = [
 ]
 
 NUMBER = re.compile(r"(?<![\w.])-?\d[\d,]*(?:\.\d+)?")
+# "2026-02-18" holds no answer numbers; without this, "02" and "18" count as numbers.
+ISO_DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
 
 # Models often write special Unicode characters that look like normal ones:
 # a non-breaking hyphen in "USB‑C", a narrow no-break space in "Grace Okafor"
@@ -87,7 +89,7 @@ def normalize(text: str) -> str:
 
 def extract_numbers(text: str) -> list[float]:
     numbers = []
-    for raw in NUMBER.findall(normalize(text)):
+    for raw in NUMBER.findall(ISO_DATE.sub(" ", normalize(text))):
         cleaned = raw.replace(",", "")
         try:
             numbers.append(float(cleaned))

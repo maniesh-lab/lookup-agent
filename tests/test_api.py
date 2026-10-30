@@ -62,6 +62,26 @@ def test_request_id_from_the_caller_is_kept(client):
     assert response.headers["X-Request-ID"] == "abc-123"
 
 
+def test_long_request_id_is_cut(client):
+    response = client.get("/health", headers={"X-Request-ID": "x" * 5000})
+    assert response.headers["X-Request-ID"] == "x" * main.MAX_REQUEST_ID_CHARS
+
+
+def test_a_crash_still_returns_a_request_id(client):
+    class BrokenAgent:
+        async def ask(self, *args, **kwargs):
+            raise RuntimeError("database went away")
+
+    main.app.dependency_overrides[main.get_agent] = BrokenAgent
+    try:
+        response = client.post("/chat", json={"message": "hi"}, headers={"X-Request-ID": "req-500"})
+    finally:
+        main.app.dependency_overrides.clear()
+    assert response.status_code == 500
+    assert response.headers["X-Request-ID"] == "req-500"
+    assert response.text == "Internal Server Error"
+
+
 def test_chat(client, agent):
     response = client.post(
         "/chat", json={"message": "what's your return window?"}, headers={"X-Request-ID": "req-1"}

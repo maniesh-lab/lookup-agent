@@ -19,6 +19,11 @@ def test_extract_numbers():
     assert extract_numbers("Total: $1,234.56 (about 1,690 CAD), 3 items") == [1234.56, 1690.0, 3.0]
 
 
+def test_dates_are_not_numbers():
+    assert extract_numbers("2 orders (2026-02-18 and 2026-04-07)") == [2.0]
+    assert not mentions_number("3 orders, on 2026-02-18 and 2026-04-02", 2)
+
+
 def test_mentions_number_with_tolerance():
     assert mentions_number("It comes to 242.90 CAD.", 242.9)
     assert mentions_number("about 24,375 INR", 24380.0, rel_tol=0.02)

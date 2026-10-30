@@ -21,6 +21,7 @@ from app.tools.registry import Tool, ToolRegistry, default_registry
         "WITH t AS (SELECT 1) SELECT * FROM t",
         "SELECT * FROM support_tickets WHERE description LIKE '%delete my account%'",
         "SELECT created_at, updated_total FROM x",  # words that only contain 'create'/'update'
+        "SELECT * FROM support_tickets WHERE description LIKE '%;%'",  # ';' inside a string is fine
     ],
 )
 def test_allowed_queries(sql):
@@ -35,6 +36,9 @@ def test_allowed_queries(sql):
         ("SELECT 1; DROP TABLE orders", "one statement"),
         ("WITH x AS (DELETE FROM orders RETURNING *) SELECT * FROM x", "found 'DELETE'"),
         ("SELECT set_config('x', 'y', false); SET ROLE postgres", "one statement"),
+        # E'\'' is a whole string; read as a plain string it would hide the DELETE
+        ("WITH a AS (SELECT E'\\''), b AS (DELETE FROM orders RETURNING 1) SELECT ''", "found 'DELETE'"),
+        ("SELECT * INTO copy_of_orders FROM orders", "found 'INTO'"),
     ],
 )
 def test_blocked_queries(sql, reason):
