@@ -1,6 +1,7 @@
 """Small helpers for Postgres connections: one-off connections (owner and
 read-only user) and the shared connection pool that search uses."""
 
+import atexit
 import threading
 
 import psycopg
@@ -43,6 +44,7 @@ def connect_readonly(url: str | None = None) -> psycopg.Connection:
 
 _search_pool: ConnectionPool | None = None
 _search_pool_lock = threading.Lock()
+_closes_at_exit = False
 
 
 def search_pool() -> ConnectionPool:
@@ -57,7 +59,7 @@ def search_pool() -> ConnectionPool:
     and hands it back before reranking. If Postgres is down, a search waits
     up to 10 s for a connection, then the tool returns an error message.
     """
-    global _search_pool
+    global _search_pool, _closes_at_exit
     with _search_pool_lock:
         if _search_pool is None:
             _search_pool = ConnectionPool(
@@ -73,6 +75,12 @@ def search_pool() -> ConnectionPool:
                 name="search",
                 open=True,
             )
+            # Scripts and evals never close it themselves. Left to garbage
+            # collection, the pool tries to join its threads while Python is
+            # shutting down, which Python 3.14 refuses with an error.
+            if not _closes_at_exit:
+                atexit.register(close_search_pool)
+                _closes_at_exit = True
         return _search_pool
 
 
