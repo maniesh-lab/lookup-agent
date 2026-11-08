@@ -122,3 +122,21 @@ def test_only_the_models_the_search_mode_needs_are_loaded(monkeypatch):
     assert loaded == ["embedder"]
     models.load_search_models("rerank")
     assert loaded == ["embedder", "embedder", "reranker"]
+
+
+def test_warm_up_waits_for_the_pool_and_loads_the_models(monkeypatch):
+    from app.retrieval import search as search_module
+
+    ran = []
+
+    class FakePool:
+        def wait(self, timeout):
+            ran.append(f"pool ready within {timeout}s")
+
+    monkeypatch.setattr(search_module, "search_pool", FakePool)
+    monkeypatch.setattr(search_module, "load_search_models", lambda mode: ran.append(f"models for {mode}"))
+
+    seconds = search_module.warm_up("rerank")
+
+    assert ran == ["pool ready within 10s", "models for rerank"]
+    assert seconds >= 0

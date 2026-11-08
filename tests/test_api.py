@@ -263,3 +263,58 @@ def test_chat_page_explains_401_and_429_without_holding_a_key(client):
     page = client.get("/").text
     assert "This server needs an API key" in page and "Slow down" in page
     assert 'X-API-Key"' not in page and 'headers: { "Content-Type": "application/json" }' in page
+
+
+# --- Server startup and shutdown (lifespan), with fakes instead of Postgres ---------
+
+
+class FakePool:
+    check_connection = None  # the lifespan passes AsyncConnectionPool.check_connection
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+
+def fake_startup(monkeypatch, *, setup_fails=False):
+    """Swap the lifespan's database pieces for fakes; return a log of what ran."""
+    import langgraph.checkpoint.postgres.aio as saver_module
+    import psycopg_pool
+
+    ran = []
+
+    class FakeSaver:
+        def __init__(self, pool):
+            pass
+
+        async def setup(self):
+            if setup_fails:
+                raise OSError("Postgres is down")
+
+    monkeypatch.setattr(psycopg_pool, "AsyncConnectionPool", FakePool)
+    monkeypatch.setattr(saver_module, "AsyncPostgresSaver", FakeSaver)
+    monkeypatch.setattr(main, "warm_up", lambda mode: ran.append(f"warm_up {mode}") or 0.1)
+    monkeypatch.setattr(main, "create_agent", lambda checkpointer: FakeAgent())
+    monkeypatch.setattr(main, "close_search_pool", lambda: ran.append("close_search_pool"))
+    return ran
+
+
+def test_startup_loads_search_before_the_first_question_and_shutdown_closes_the_pool(monkeypatch):
+    ran = fake_startup(monkeypatch)
+    with TestClient(main.app) as client:  # as a context manager, so the lifespan runs
+        assert ran == [f"warm_up {main.settings.search_mode}"]
+        assert client.post("/chat", json={"message": "hi"}).json()["answer"] == "You have 30 days."
+    assert ran[-1] == "close_search_pool"
+
+
+def test_the_search_pool_is_closed_even_when_startup_fails(monkeypatch):
+    ran = fake_startup(monkeypatch, setup_fails=True)
+    with pytest.raises(OSError, match="Postgres is down"):
+        with TestClient(main.app):
+            pass
+    assert ran[-1] == "close_search_pool"
