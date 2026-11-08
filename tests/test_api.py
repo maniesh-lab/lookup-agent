@@ -33,6 +33,16 @@ def agent():
     main.app.dependency_overrides.clear()
 
 
+@pytest.fixture(autouse=True)
+def open_chat_defaults(monkeypatch):
+    """Every test starts with the defaults: no API key, the default rate limit, no counts."""
+    monkeypatch.setattr(main.settings, "chat_api_key", None)
+    monkeypatch.setattr(main.settings, "chat_rate_limit_per_minute", 20)
+    main.chat_rate_limiter.reset()
+    yield
+    main.chat_rate_limiter.reset()
+
+
 @pytest.fixture
 def client():
     return TestClient(main.app)  # not used as a context manager, so startup doesn't run
@@ -128,6 +138,7 @@ def test_ingest_needs_the_token_when_one_is_set(client, monkeypatch):
     monkeypatch.setattr(main.settings, "ingest_token", "secret")
     assert client.post("/ingest").status_code == 401
     assert client.post("/ingest", headers={"X-Ingest-Token": "wrong"}).status_code == 401
+    assert client.post("/ingest", headers={"X-Ingest-Token": "é".encode("latin-1")}).status_code == 401
     assert client.post("/ingest", headers={"X-Ingest-Token": "secret"}).status_code == 200
 
 
@@ -192,3 +203,63 @@ async def test_search_warm_up_loads_for_the_configured_mode(monkeypatch):
     monkeypatch.setattr(main.settings, "search_mode", "hybrid")
     await main.warm_up_search()
     assert modes == ["hybrid"]
+
+
+# --- API key and rate limit on /chat ------------------------------------------------
+
+
+def test_chat_needs_no_key_by_default(client, agent):
+    response = client.post("/chat", json={"message": "hi"})
+    assert response.status_code == 200
+    assert len(agent.asked) == 1
+
+
+@pytest.mark.parametrize(
+    "headers", [{}, {"X-API-Key": "wrong"}, {"X-API-Key": ""}, {"X-API-Key": "é".encode("latin-1")}]
+)
+def test_chat_refuses_a_missing_or_wrong_key(client, agent, monkeypatch, headers):
+    monkeypatch.setattr(main.settings, "chat_api_key", "the-key")
+    response = client.post("/chat", json={"message": "hi"}, headers=headers)
+    assert response.status_code == 401
+    assert "needs an API key" in response.json()["detail"]
+    assert agent.asked == []  # refused before the agent ran
+
+
+def test_chat_accepts_the_right_key(client, agent, monkeypatch):
+    monkeypatch.setattr(main.settings, "chat_api_key", "the-key")
+    response = client.post("/chat", json={"message": "hi"}, headers={"X-API-Key": "the-key"})
+    assert response.status_code == 200
+    assert len(agent.asked) == 1
+
+
+def test_chat_rate_limit_returns_429_before_the_agent_runs(client, agent, monkeypatch):
+    monkeypatch.setattr(main.settings, "chat_rate_limit_per_minute", 3)
+    statuses = [client.post("/chat", json={"message": "hi"}).status_code for _ in range(5)]
+    assert statuses == [200, 200, 200, 429, 429]
+    assert len(agent.asked) == 3
+
+    response = client.post("/chat", json={"message": "hi"})
+    assert response.json()["detail"].startswith("Slow down")
+    assert 1 <= int(response.headers["Retry-After"]) <= 60
+    assert response.headers["X-Request-ID"]
+
+
+def test_wrong_keys_count_towards_the_rate_limit(client, agent, monkeypatch):
+    monkeypatch.setattr(main.settings, "chat_api_key", "the-key")
+    monkeypatch.setattr(main.settings, "chat_rate_limit_per_minute", 2)
+    statuses = [
+        client.post("/chat", json={"message": "hi"}, headers={"X-API-Key": "guess"}).status_code
+        for _ in range(3)
+    ]
+    assert statuses == [401, 401, 429]
+
+
+def test_chat_rate_limit_can_be_turned_off(client, agent, monkeypatch):
+    monkeypatch.setattr(main.settings, "chat_rate_limit_per_minute", 0)
+    assert all(client.post("/chat", json={"message": "hi"}).status_code == 200 for _ in range(30))
+
+
+def test_chat_page_explains_401_and_429_without_holding_a_key(client):
+    page = client.get("/").text
+    assert "This server needs an API key" in page and "Slow down" in page
+    assert 'X-API-Key"' not in page and 'headers: { "Content-Type": "application/json" }' in page
