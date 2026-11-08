@@ -27,7 +27,7 @@ class FxArgs(BaseModel):
     to_currency: str
 
 
-def fake_registry(log: list) -> ToolRegistry:
+def fake_registry(log: list, search_text: str = "You can return most items within 30 days.") -> ToolRegistry:
     def search_docs(query):
         log.append(("search_docs", query))
         return json.dumps(
@@ -36,7 +36,7 @@ def fake_registry(log: list) -> ToolRegistry:
                     {
                         "source": "returns.md",
                         "section": "Returns Policy > Return window",
-                        "text": "You can return most items within 30 days.",
+                        "text": search_text,
                         "score": 0.9,
                     }
                 ]
@@ -257,3 +257,84 @@ async def test_conversation_continues_after_a_stopped_turn():
     sent = llm.calls[-1]["messages"]
     assert not any(m.get("tool_calls") for m in sent)  # the unanswered request was dropped
     assert [m["content"] for m in sent if m["role"] == "user"] == ["first question", "second question"]
+
+
+# --- Trimming long conversations ------------------------------------------------
+
+from app.agent.graph import (  # noqa: E402
+    OLD_RESULT_PLACEHOLDER,
+    TRIM_RESULTS_OVER_CHARS,
+    trim_old_tool_results,
+)
+
+
+def test_trim_replaces_only_earlier_turns_results():
+    long_result = "x" * 500
+    history = [
+        {"role": "user", "content": "q1"},
+        {"role": "assistant", "content": None, "tool_calls": [call("a")]},
+        {"role": "tool", "tool_call_id": "a", "content": long_result},
+        {"role": "assistant", "content": "answer 1"},
+        {"role": "user", "content": "q2"},
+        {"role": "assistant", "content": None, "tool_calls": [call("b")]},
+        {"role": "tool", "tool_call_id": "b", "content": long_result},
+    ]
+    trimmed = trim_old_tool_results(history)
+
+    assert trimmed[2] == {"role": "tool", "tool_call_id": "a", "content": OLD_RESULT_PLACEHOLDER}
+    assert trimmed[6]["content"] == long_result  # the current turn is untouched
+    assert trimmed[1]["tool_calls"] == [call("a")]  # the request keeps its result
+    assert [m["role"] for m in trimmed] == [m["role"] for m in history]
+    assert history[2]["content"] == long_result  # the input list is not changed
+
+
+def test_trim_keeps_short_results_and_single_turns():
+    short = [
+        {"role": "user", "content": "q1"},
+        {"role": "assistant", "content": None, "tool_calls": [call("a")]},
+        {"role": "tool", "tool_call_id": "a", "content": "{}"},
+        {"role": "assistant", "content": "answer 1"},
+        {"role": "user", "content": "q2"},
+    ]
+    short[2]["content"] = "r" * TRIM_RESULTS_OVER_CHARS
+    assert trim_old_tool_results(short) == short  # too short to be worth trimming
+    assert trim_old_tool_results(short[:3]) == short[:3]  # one turn: nothing is earlier
+    assert trim_old_tool_results([]) == []
+
+
+async def test_follow_up_sends_trimmed_history_but_saves_the_full_one():
+    calls = []
+    llm = FakeLLM(
+        [
+            tool_reply("search_docs", {"query": "return window"}, "t1"),
+            text_reply("You have 30 days to return an item."),
+            tool_reply("search_docs", {"query": "return window premium"}, "t2"),
+            text_reply("Premium members also get 30 days."),
+        ]
+    )
+    long_text = "You can return most items within 30 days. " + "More policy details. " * 20
+    agent = make_agent(llm, fake_registry(calls, search_text=long_text))
+
+    first = await agent.ask("what's your return window?")
+    second = await agent.ask("and for premium members?", thread_id=first.thread_id)
+
+    # Turn 2, first LLM call: turn 1's result is a placeholder, its answer is kept.
+    sent = llm.calls[2]["messages"]
+    old_result = next(m for m in sent if m.get("tool_call_id") == "t1")
+    assert old_result["content"] == OLD_RESULT_PLACEHOLDER
+    assert "You have 30 days to return an item." in [m["content"] for m in sent]
+    assert any(c["id"] == "t1" for m in sent for c in m.get("tool_calls") or [])
+
+    # Turn 2, second LLM call: its own fresh result is sent in full.
+    sent = llm.calls[3]["messages"]
+    assert "30 days" in next(m for m in sent if m.get("tool_call_id") == "t2")["content"]
+    assert next(m for m in sent if m.get("tool_call_id") == "t1")["content"] == OLD_RESULT_PLACEHOLDER
+
+    # The follow-up still works, and the saved conversation keeps the full result.
+    assert second.answer == "Premium members also get 30 days."
+    assert second.sources == [
+        {"type": "document", "name": "returns.md", "section": "Returns Policy > Return window"}
+    ]
+    config = {"configurable": {"thread_id": first.thread_id}}
+    saved = (await agent.graph.aget_state(config)).values["messages"]
+    assert "30 days" in next(m for m in saved if m.get("tool_call_id") == "t1")["content"]
