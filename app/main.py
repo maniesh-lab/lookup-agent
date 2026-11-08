@@ -16,7 +16,8 @@ from app.agent import Agent, create_agent
 from app.core import tracing
 from app.core.config import settings
 from app.core.logging import configure_logging
-from app.db import plain_url
+from app.db import close_search_pool, plain_url
+from app.retrieval.search import warm_up
 
 log = structlog.get_logger(__name__)
 
@@ -43,18 +44,38 @@ async def lifespan(app: FastAPI):
         check=AsyncConnectionPool.check_connection,
         open=False,
     )
-    async with pool:
-        saver = AsyncPostgresSaver(pool)
-        await saver.setup()
-        app.state.agent = create_agent(checkpointer=saver)
-        log.info(
-            "app_started",
-            prompt_version=settings.prompt_version,
-            llm_provider=settings.llm_provider,
-            tracing=tracing.enabled(),
-        )
-        yield
-    tracing.flush()
+    await warm_up_search()
+    try:
+        async with pool:
+            saver = AsyncPostgresSaver(pool)
+            await saver.setup()
+            app.state.agent = create_agent(checkpointer=saver)
+            log.info(
+                "app_started",
+                prompt_version=settings.prompt_version,
+                llm_provider=settings.llm_provider,
+                tracing=tracing.enabled(),
+            )
+            yield
+    finally:
+        await asyncio.to_thread(close_search_pool)
+        tracing.flush()
+
+
+async def warm_up_search() -> None:
+    """Load the search models and open the search pool at startup.
+
+    Otherwise the first question waits for them (about 10 s, measured on
+    2026-11-08). Runs in a thread so the event loop isn't blocked. A failure
+    is logged, not fatal: the other tools still work and search tries again
+    when it is first used.
+    """
+    try:
+        seconds = await asyncio.to_thread(warm_up, settings.search_mode)
+    except Exception:
+        log.exception("search_warm_up_failed")
+    else:
+        log.info("search_ready", mode=settings.search_mode, load_seconds=round(seconds, 2))
 
 
 app = FastAPI(

@@ -84,6 +84,16 @@ def text_reply(text: str) -> LLMResponse:
     return LLMResponse(text=text, finish_reason="stop")
 
 
+@pytest.fixture(autouse=True)
+def close_the_search_pool():
+    """The search pool is shared by the process; a test that used it must not
+    hand it (and its database URL) to the next test."""
+    yield
+    from app.db import close_search_pool
+
+    close_search_pool()
+
+
 @pytest.fixture
 def fake_embedder():
     return FakeEmbedder()

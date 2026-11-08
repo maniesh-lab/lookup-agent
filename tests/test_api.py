@@ -176,3 +176,19 @@ async def test_chat_is_cancelled_when_the_caller_hangs_up(monkeypatch):
 def test_chat_page_has_a_stop_button(client):
     page = client.get("/").text
     assert "AbortController" in page and 'id="i-stop"' in page
+
+
+async def test_search_warm_up_failure_does_not_stop_the_server(monkeypatch):
+    def broken_warm_up(mode):
+        raise OSError("no network and no cached model")
+
+    monkeypatch.setattr(main, "warm_up", broken_warm_up)
+    await main.warm_up_search()  # logged, not raised
+
+
+async def test_search_warm_up_loads_for_the_configured_mode(monkeypatch):
+    modes = []
+    monkeypatch.setattr(main, "warm_up", lambda mode: modes.append(mode) or 0.5)
+    monkeypatch.setattr(main.settings, "search_mode", "hybrid")
+    await main.warm_up_search()
+    assert modes == ["hybrid"]

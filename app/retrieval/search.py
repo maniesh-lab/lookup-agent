@@ -9,15 +9,20 @@
             re-score each one against the question.
 
 eval/run_retrieval_eval.py measures the hit rate of each layer.
+
+Connections come from a shared pool (app.db.search_pool) unless a caller
+passes its own, and the models are loaded once (app.retrieval.models).
+Per search, the reranker is the slow step: about 180 of 210 ms.
 """
 
 import re
+import time
 from dataclasses import dataclass
 
 import numpy as np
 
-from app.db import connect
-from app.retrieval.models import Embedder, Reranker, get_embedder, get_reranker
+from app.db import search_pool
+from app.retrieval.models import Embedder, Reranker, get_embedder, get_reranker, load_search_models
 
 MODES = ("vector", "hybrid", "rerank")
 CANDIDATES = 20  # how many results each method fetches before merging
@@ -99,6 +104,19 @@ def reciprocal_rank_fusion(result_lists: list[list[SearchHit]], k: int = 60) -> 
     ]
 
 
+def warm_up(mode: str) -> float:
+    """Open the connection pool and load the models, before any question needs them.
+
+    Returns how long it took, in seconds. Blocking: the server runs it in a thread.
+    """
+    start = time.perf_counter()
+    # The pool connects in the background; waiting here makes a database that
+    # is down show up as a failed warm-up instead of a misleading "ready".
+    search_pool().wait(timeout=10)
+    load_search_models(mode)
+    return time.perf_counter() - start
+
+
 def search(
     query: str,
     *,
@@ -112,25 +130,29 @@ def search(
         raise ValueError(f"mode must be one of {MODES}")
 
     embedder = embedder or get_embedder()
-    own_conn = conn is None
-    conn = conn or connect(vector=True)
-    try:
-        qvec = embedder.embed_query(query)
-        if mode == "vector":
-            return vector_search(conn, qvec, k)
-
-        fused = reciprocal_rank_fusion(
-            [vector_search(conn, qvec, CANDIDATES), keyword_search(conn, query, CANDIDATES)]
-        )
-        if mode == "hybrid":
-            return fused[:k]
-
+    if mode == "rerank":
         reranker = reranker or get_reranker()
-        candidates = fused[:CANDIDATES]
-        scores = reranker.score(query, [f"{h.heading}\n{h.content}" for h in candidates])
-        for hit, score in zip(candidates, scores, strict=True):
-            hit.score = score
-        return sorted(candidates, key=lambda h: h.score, reverse=True)[:k]
-    finally:
-        if own_conn:
-            conn.close()
+    qvec = embedder.embed_query(query)
+    if conn is not None:
+        hits = _database_hits(conn, query, qvec, mode=mode, k=k)
+    else:
+        # The connection goes back to the pool before the (slower) reranking.
+        with search_pool().connection() as pooled:
+            hits = _database_hits(pooled, query, qvec, mode=mode, k=k)
+    if mode != "rerank":
+        return hits
+
+    scores = reranker.score(query, [f"{h.heading}\n{h.content}" for h in hits])
+    for hit, score in zip(hits, scores, strict=True):
+        hit.score = score
+    return sorted(hits, key=lambda h: h.score, reverse=True)[:k]
+
+
+def _database_hits(conn, query: str, qvec, *, mode: str, k: int) -> list[SearchHit]:
+    """The database part of a search: the final top k, or the candidates to rerank."""
+    if mode == "vector":
+        return vector_search(conn, qvec, k)
+    fused = reciprocal_rank_fusion(
+        [vector_search(conn, qvec, CANDIDATES), keyword_search(conn, query, CANDIDATES)]
+    )
+    return fused[:CANDIDATES] if mode == "rerank" else fused[:k]
