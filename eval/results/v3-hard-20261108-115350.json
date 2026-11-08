@@ -1,0 +1,79 @@
+{
+  "set": "hard",
+  "prompt": "v3",
+  "model": "openai/gpt-oss-120b",
+  "provider": "groq",
+  "tokens": 13653,
+  "rate_date": "2026-11-06",
+  "records": [
+    {
+      "id": "h06",
+      "category": "FOLLOWUP",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "And what's that order's total in euros at today's rate?",
+      "answer": "The order total of **$114.98 USD** converts to **\u20ac102.98 EUR** (rate\u202f0.89566 on\u202f2026\u201111\u201106).\n\n**Sources:** shop database; Frankfurter exchange-rate API.",
+      "tools_used": [
+        "convert_currency"
+      ],
+      "sources": [
+        {
+          "type": "api",
+          "name": "Frankfurter exchange-rate API",
+          "detail": "1 USD = 0.89566 EUR (rate date 2026-11-06)"
+        }
+      ],
+      "expected": {
+        "truth": [
+          {
+            "check": "number",
+            "values": [
+              114.98
+            ],
+            "expected_number": 102.98,
+            "converted": true
+          }
+        ],
+        "fx": null
+      },
+      "seconds": 3.27
+    },
+    {
+      "id": "h07",
+      "category": "FOLLOWUP",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "And how many basic ones?",
+      "answer": "**23 basic customers** live in Kathmandu.\n\n**Sources:** shop database.**23 basic customers** live in Kathmandu.\n\n**Sources:** shop database.",
+      "tools_used": [
+        "query_database"
+      ],
+      "sources": [
+        {
+          "type": "database",
+          "name": "shop database",
+          "query": "SELECT COUNT(*) AS basic_count FROM customers WHERE city = 'Kathmandu' AND plan = 'basic';"
+        }
+      ],
+      "expected": {
+        "truth": [
+          {
+            "check": "number",
+            "values": [
+              23
+            ],
+            "expected_number": 23.0
+          }
+        ],
+        "fx": null
+      },
+      "seconds": 7.67
+    }
+  ]
+}

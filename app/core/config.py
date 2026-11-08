@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.0
 
     # Agent
-    prompt_version: str = "v2"
+    prompt_version: str = "v3"
     max_agent_steps: int = 6
 
     # Search
@@ -44,6 +44,10 @@ class Settings(BaseSettings):
 
     # API
     ingest_token: str | None = None  # if set, POST /ingest needs X-Ingest-Token
+    chat_api_key: str | None = None  # if set, POST /chat needs X-API-Key
+    # Questions per client IP in any 60 seconds (0 turns the limit off).
+    # In-memory and per process: see app/core/rate_limit.py for its limits.
+    chat_rate_limit_per_minute: int = 20
     log_level: str = "INFO"
 
 

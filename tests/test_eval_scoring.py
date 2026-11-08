@@ -34,6 +34,10 @@ def test_refusal_detection():
     assert is_refusal("Sorry, I don't have information about website visits.")
     assert is_refusal("The shop doesn’t track stock levels.")
     assert not is_refusal("You have 30 days to return it.")
+    # Prompt v3's wording on q22 (2026-11-08), a correct refusal the first list missed.
+    assert is_refusal(
+        "The database does not contain cost or profit data, so I can't calculate or provide it."
+    )
 
 
 def test_score_db_case():

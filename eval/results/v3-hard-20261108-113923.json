@@ -1,0 +1,162 @@
+{
+  "set": "hard",
+  "prompt": "v3",
+  "model": "openai/gpt-oss-120b",
+  "provider": "groq",
+  "tokens": 18849,
+  "rate_date": null,
+  "records": [
+    {
+      "id": "h01",
+      "category": "TRAP",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "What did Hannah Montoya order in March 2026?",
+      "answer": "I couldn\u2019t find any customer named **Hannah\u202fMontoya** in the database, so there are no orders to list for March\u202f2026.  \n\n**Sources:** shop database.",
+      "tools_used": [
+        "query_database"
+      ],
+      "sources": [
+        {
+          "type": "database",
+          "name": "shop database",
+          "query": "SELECT id FROM customers WHERE full_name = 'Hannah Montoya';"
+        }
+      ],
+      "expected": {
+        "truth": [],
+        "fx": null
+      },
+      "seconds": 1.64
+    },
+    {
+      "id": "h02",
+      "category": "TRAP",
+      "passed": false,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": false,
+      "failures": [
+        "answer doesn't mention any of ['no order', 'no orders', \"didn't place\", 'did not place', \"couldn't find\", 'could not find', \"can't find\", 'cannot find', 'not find', 'no record', 'no matching']"
+      ],
+      "question": "What was the total of Priya Sharma's order on March 3, 2026?",
+      "answer": "Priya\u202fSharma did not have any order recorded on\u202f2026\u201103\u201103, so there is no total to report.  \n\n**Sources:** shop database.",
+      "tools_used": [
+        "query_database",
+        "query_database",
+        "query_database"
+      ],
+      "sources": [
+        {
+          "type": "database",
+          "name": "shop database",
+          "query": "SELECT id FROM customers WHERE full_name = 'Priya Sharma';"
+        },
+        {
+          "type": "database",
+          "name": "shop database",
+          "query": "SELECT total FROM orders WHERE customer_id = 151 AND order_date = '2026-03-03' AND status <> 'cancelled';"
+        },
+        {
+          "type": "database",
+          "name": "shop database",
+          "query": "SELECT total, status FROM orders WHERE customer_id = 151 AND order_date = '2026-03-03';"
+        }
+      ],
+      "expected": {
+        "truth": [],
+        "fx": null
+      },
+      "seconds": 3.06
+    },
+    {
+      "id": "h03",
+      "category": "TRAP",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "How many orders were placed in August 2026?",
+      "answer": "**0 orders** were placed in August\u202f2026.\n\nSources: shop database.",
+      "tools_used": [
+        "query_database"
+      ],
+      "sources": [
+        {
+          "type": "database",
+          "name": "shop database",
+          "query": "SELECT COUNT(*) AS order_count FROM orders WHERE order_date BETWEEN '2026-08-01' AND '2026-08-31';"
+        }
+      ],
+      "expected": {
+        "truth": [],
+        "fx": null
+      },
+      "seconds": 1.17
+    },
+    {
+      "id": "h14",
+      "category": "TRAP",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "how many ordrs has priya sharma placed in total",
+      "answer": "Priya Sharma has placed **2 orders** in total.  \n\n**Sources:** shop database.",
+      "tools_used": [
+        "query_database"
+      ],
+      "sources": [
+        {
+          "type": "database",
+          "name": "shop database",
+          "query": "SELECT COUNT(*) AS order_count FROM orders o JOIN customers c ON o.customer_id = c.id WHERE c.full_name = 'Priya Sharma';"
+        }
+      ],
+      "expected": {
+        "truth": [
+          {
+            "check": "number",
+            "values": [
+              2
+            ],
+            "expected_number": 2.0
+          }
+        ],
+        "fx": null
+      },
+      "seconds": 17.46
+    },
+    {
+      "id": "h15",
+      "category": "TRAP",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "What's the cheapest product in the toys category?",
+      "answer": "I\u2019m sorry, but we don\u2019t have a \u201ctoys\u201d category in our product catalog, so I can\u2019t identify a cheapest product for that category. \n\n**Sources:** shop database (no matching rows)",
+      "tools_used": [
+        "query_database"
+      ],
+      "sources": [
+        {
+          "type": "database",
+          "name": "shop database",
+          "query": "SELECT id, name, price FROM products WHERE category = 'toys' ORDER BY price ASC LIMIT 5"
+        }
+      ],
+      "expected": {
+        "truth": [],
+        "fx": null
+      },
+      "seconds": 19.72
+    }
+  ]
+}

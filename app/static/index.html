@@ -266,6 +266,13 @@
       font-size: 0.92rem;
     }
     .error button { margin-top: 8px; }
+    /* Not a failure, just a rule of this server (needs a key, slow down). */
+    .error.notice {
+      border-color: color-mix(in srgb, var(--lamp) 45%, var(--line));
+      background: var(--lamp-wash);
+      color: var(--ink);
+    }
+    .error.notice strong { display: block; color: var(--lamp-ink); margin-bottom: 2px; }
     .stopped { color: var(--ink-faint); font-size: 0.88rem; padding: 2px 4px; }
 
     /* Composer */
@@ -508,8 +515,11 @@
       scrollDown();
     }
 
-    function addError(message, retryText) {
-      const box = el("div", { class: "error", role: "alert" }, el("div", { text: message }));
+    function addError(message, retryText, title = null) {
+      const box = el("div", { class: title ? "error notice" : "error", role: "alert" }, [
+        ...(title ? [el("strong", { text: title })] : []),
+        el("div", { text: message }),
+      ]);
       if (retryText) {
         const retry = el("button", { class: "tool-btn", type: "button", text: "Try again" });
         retry.addEventListener("click", () => { box.parentElement.remove(); ask(retryText, { echo: false }); });
@@ -528,6 +538,31 @@
     }
 
     // ---------- Talking to the API ----------
+    // A server with CHAT_API_KEY set refuses this page (it never holds a key), and
+    // any server can ask a client to slow down. Both get a calm notice, not an error.
+    const NOTICES = {
+      401: {
+        title: "This server needs an API key",
+        text: "Questions here have to come with an API key, which this page doesn't send. " +
+          "If you run this server, leave CHAT_API_KEY empty to use the chat page, or send " +
+          "the key in the X-API-Key header from your own app.",
+        retry: false,
+      },
+      429: { title: "Slow down", text: "Too many questions in the last minute. Wait a little, then try again.", retry: true },
+    };
+
+    function showFailure(status, body, text) {
+      const notice = NOTICES[status];
+      if (!notice) { addError(errorMessage(status, body), text); return; }
+      // The server's own 429 message says how long to wait (its "Slow down:" is the title here).
+      let message = notice.text;
+      if (status === 429 && body && typeof body.detail === "string") {
+        const rest = body.detail.replace(/^Slow down:\s*/, "");
+        message = rest.charAt(0).toUpperCase() + rest.slice(1);
+      }
+      addError(message, notice.retry ? text : null, notice.title);
+    }
+
     function errorMessage(status, body) {
       if (status === 503) return "The language model is unavailable right now. Try again in a moment.";
       if (status === 422) return "That question couldn't be sent. Questions need 1 to 2,000 characters.";
@@ -554,7 +589,7 @@
         let body = null;
         try { body = await res.json(); } catch { /* not JSON */ }
         thinking.remove();
-        if (!res.ok) { addError(errorMessage(res.status, body), text); return; }
+        if (!res.ok) { showFailure(res.status, body, text); return; }
         threadId = body.thread_id;
         addAnswer(body);
       } catch (err) {

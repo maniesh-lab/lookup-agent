@@ -16,7 +16,9 @@ from app.agent import Agent, create_agent
 from app.core import tracing
 from app.core.config import settings
 from app.core.logging import configure_logging
-from app.db import plain_url
+from app.core.rate_limit import SlidingWindowRateLimiter
+from app.db import close_search_pool, plain_url
+from app.retrieval.search import warm_up
 
 log = structlog.get_logger(__name__)
 
@@ -43,18 +45,38 @@ async def lifespan(app: FastAPI):
         check=AsyncConnectionPool.check_connection,
         open=False,
     )
-    async with pool:
-        saver = AsyncPostgresSaver(pool)
-        await saver.setup()
-        app.state.agent = create_agent(checkpointer=saver)
-        log.info(
-            "app_started",
-            prompt_version=settings.prompt_version,
-            llm_provider=settings.llm_provider,
-            tracing=tracing.enabled(),
-        )
-        yield
-    tracing.flush()
+    await warm_up_search()
+    try:
+        async with pool:
+            saver = AsyncPostgresSaver(pool)
+            await saver.setup()
+            app.state.agent = create_agent(checkpointer=saver)
+            log.info(
+                "app_started",
+                prompt_version=settings.prompt_version,
+                llm_provider=settings.llm_provider,
+                tracing=tracing.enabled(),
+            )
+            yield
+    finally:
+        await asyncio.to_thread(close_search_pool)
+        tracing.flush()
+
+
+async def warm_up_search() -> None:
+    """Load the search models and open the search pool at startup.
+
+    Otherwise the first question waits for them (about 10 s, measured on
+    2026-11-08). Runs in a thread so the event loop isn't blocked. A failure
+    is logged, not fatal: the other tools still work and search tries again
+    when it is first used.
+    """
+    try:
+        seconds = await asyncio.to_thread(warm_up, settings.search_mode)
+    except Exception:
+        log.exception("search_warm_up_failed")
+    else:
+        log.info("search_ready", mode=settings.search_mode, load_seconds=round(seconds, 2))
 
 
 app = FastAPI(
@@ -179,12 +201,57 @@ DISCONNECT_CHECK_SECONDS = 0.5
 CLIENT_CLOSED_REQUEST = 499  # nginx's status for "the client hung up first"
 
 
+chat_rate_limiter = SlidingWindowRateLimiter()
+
+
+def limit_chat_rate(request: Request) -> None:
+    """Refuse a client's question when it already sent the limit in the last 60 seconds.
+
+    Runs before the API key check, so guessing keys counts against the
+    limit too. Clients are told apart by IP, as uvicorn reports it (see
+    app/core/rate_limit.py for what that means behind a proxy).
+    """
+    limit = settings.chat_rate_limit_per_minute
+    if limit <= 0:
+        return
+    client = request.client.host if request.client else "unknown"
+    wait = chat_rate_limiter.hit(client, limit)
+    if wait is not None:
+        log.warning("chat_rate_limited", client=client, limit=limit, retry_after=wait)
+        raise HTTPException(
+            status_code=429,
+            detail=f"Slow down: this server answers up to {limit} questions per minute from one "
+            f"address. Please wait {wait} seconds and try again.",
+            headers={"Retry-After": str(wait)},
+        )
+
+
+def same_secret(given: str | None, expected: str) -> bool:
+    """Constant-time comparison. Compared as bytes: compare_digest raises on
+    non-ASCII str, which would turn a strange header into a 500 instead of a 401."""
+    return bool(given) and secrets.compare_digest(given.encode(), expected.encode())
+
+
+def check_chat_api_key(x_api_key: str | None = Header(default=None)) -> None:
+    """With CHAT_API_KEY set, every question needs the X-API-Key header. Empty: open to all."""
+    if settings.chat_api_key and not same_secret(x_api_key, settings.chat_api_key):
+        raise HTTPException(
+            status_code=401,
+            detail="This server needs an API key: send it in the X-API-Key header.",
+            headers={"WWW-Authenticate": "X-API-Key"},
+        )
+
+
 @app.post(
     "/chat",
     response_model=ChatResponse,
     response_model_exclude_none=True,
+    # Both run before the request body is handled, so a refused request never reaches the agent.
+    dependencies=[Depends(limit_chat_rate), Depends(check_chat_api_key)],
     responses={
-        CLIENT_CLOSED_REQUEST: {"description": "The caller stopped waiting; the answer was cancelled."}
+        401: {"description": "CHAT_API_KEY is set and X-API-Key is missing or wrong."},
+        429: {"description": "Too many questions from this address in the last 60 seconds."},
+        CLIENT_CLOSED_REQUEST: {"description": "The caller stopped waiting; the answer was cancelled."},
     },
 )
 async def chat(body: ChatRequest, request: Request, agent: Agent = Depends(get_agent)):
@@ -221,9 +288,7 @@ async def chat(body: ChatRequest, request: Request, agent: Agent = Depends(get_a
 
 
 def check_ingest_token(x_ingest_token: str | None = Header(default=None)) -> None:
-    if settings.ingest_token and not (
-        x_ingest_token and secrets.compare_digest(x_ingest_token, settings.ingest_token)
-    ):
+    if settings.ingest_token and not same_secret(x_ingest_token, settings.ingest_token):
         raise HTTPException(status_code=401, detail="Missing or wrong X-Ingest-Token header.")
 
 

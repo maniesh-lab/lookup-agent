@@ -76,5 +76,67 @@ def test_keyword_query_ors_words():
 
 
 def test_prompts_load():
-    assert available_versions() == ["v1", "v2"]
+    assert available_versions() == ["v1", "v2", "v3"]
     assert "Today's date is 2026-01-02" in load_prompt("v1", today=__import__("datetime").date(2026, 1, 2))
+
+
+# --- Loading the search models ---------------------------------------------------
+
+
+def test_models_load_from_the_cache_first():
+    from app.retrieval.models import load_cached_first
+
+    tried = []
+
+    class Model:
+        def __init__(self, name, local_files_only=False):
+            tried.append(local_files_only)
+
+    load_cached_first(Model, "some/model")
+    assert tried == [True]  # found locally: no online check
+
+
+def test_models_are_downloaded_when_not_cached():
+    from app.retrieval.models import load_cached_first
+
+    tried = []
+
+    class Model:
+        def __init__(self, name, local_files_only=False):
+            tried.append(local_files_only)
+            if local_files_only:
+                raise OSError("not in the cache")
+
+    load_cached_first(Model, "some/model")
+    assert tried == [True, False]
+
+
+def test_only_the_models_the_search_mode_needs_are_loaded(monkeypatch):
+    from app.retrieval import models
+
+    loaded = []
+    monkeypatch.setattr(models, "get_embedder", lambda: loaded.append("embedder"))
+    monkeypatch.setattr(models, "get_reranker", lambda: loaded.append("reranker"))
+
+    models.load_search_models("hybrid")
+    assert loaded == ["embedder"]
+    models.load_search_models("rerank")
+    assert loaded == ["embedder", "embedder", "reranker"]
+
+
+def test_warm_up_waits_for_the_pool_and_loads_the_models(monkeypatch):
+    from app.retrieval import search as search_module
+
+    ran = []
+
+    class FakePool:
+        def wait(self, timeout):
+            ran.append(f"pool ready within {timeout}s")
+
+    monkeypatch.setattr(search_module, "search_pool", FakePool)
+    monkeypatch.setattr(search_module, "load_search_models", lambda mode: ran.append(f"models for {mode}"))
+
+    seconds = search_module.warm_up("rerank")
+
+    assert ran == ["pool ready within 10s", "models for rerank"]
+    assert seconds >= 0

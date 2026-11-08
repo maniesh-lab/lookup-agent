@@ -1,6 +1,6 @@
 # Search hit rate
 
-Run: 2026-10-24 12:50, 26 queries
+Run: 2026-11-08 11:43, 26 queries
 
 | mode | hit rate @5 | MRR |
 |---|---|---|

@@ -63,6 +63,10 @@ REFUSAL_PHRASES = [
     "no way to",
     "can't provide",
     "cannot provide",
+    "can't calculate",
+    "cannot calculate",
+    "doesn't contain",
+    "does not contain",
     "can't tell",
     "cannot tell",
 ]

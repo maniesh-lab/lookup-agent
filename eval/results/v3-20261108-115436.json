@@ -1,0 +1,198 @@
+{
+  "set": "main",
+  "prompt": "v3",
+  "model": "openai/gpt-oss-20b",
+  "provider": "groq",
+  "tokens": 16311,
+  "rate_date": "2026-11-06",
+  "records": [
+    {
+      "id": "q01",
+      "category": "DOCS",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "what's your return window?",
+      "answer": "You can return most items within **30 days of the delivery date**. The item must be unused, in its original packaging, and with any tags still attached. Returns that arrive after the 30\u2011day window are not accepted unless the item is covered by the warranty or the damaged\u2011item policy.  \n\n**Sources:** returns.md (Returns Policy > Return window)",
+      "tools_used": [
+        "search_docs"
+      ],
+      "sources": [
+        {
+          "type": "document",
+          "name": "returns.md",
+          "section": "Returns Policy > Return window"
+        },
+        {
+          "type": "document",
+          "name": "returns.md",
+          "section": "Returns Policy > How to start a return"
+        },
+        {
+          "type": "document",
+          "name": "returns.md",
+          "section": "Returns Policy > Items that cannot be returned"
+        },
+        {
+          "type": "document",
+          "name": "returns.md",
+          "section": "Returns Policy > Overview"
+        },
+        {
+          "type": "document",
+          "name": "returns.md",
+          "section": "Returns Policy > Exchanges"
+        }
+      ],
+      "expected": {
+        "truth": [],
+        "fx": null
+      },
+      "seconds": 10.22
+    },
+    {
+      "id": "q08",
+      "category": "DB",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "How many orders were cancelled between January 1 and January 31, 2026?",
+      "answer": "There was **1 order cancelled** between January\u202f1 and January\u202f31,\u202f2026.  \n\nSources: shop database (orders table)",
+      "tools_used": [
+        "query_database"
+      ],
+      "sources": [
+        {
+          "type": "database",
+          "name": "shop database",
+          "query": "SELECT COUNT(*) AS cancelled_count FROM orders WHERE status = 'cancelled' AND order_date BETWEEN '2026-01-01' AND '2026-01-31';"
+        }
+      ],
+      "expected": {
+        "truth": [
+          {
+            "check": "number",
+            "values": [
+              1
+            ],
+            "expected_number": 1.0
+          }
+        ],
+        "fx": null
+      },
+      "seconds": 1.02
+    },
+    {
+      "id": "q14",
+      "category": "API",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "What's the exchange rate from GBP to USD today?",
+      "answer": "The current exchange rate from GBP to USD is **1.3385\u202fUSD per\u202fGBP** (latest available rate from 2026\u201111\u201106).  \n\n**Sources:** Frankfurter exchange\u2011rate API (European Central Bank reference rates)",
+      "tools_used": [
+        "convert_currency"
+      ],
+      "sources": [
+        {
+          "type": "api",
+          "name": "Frankfurter exchange-rate API",
+          "detail": "1 GBP = 1.3385 USD (rate date 2026-11-06)"
+        }
+      ],
+      "expected": {
+        "truth": [],
+        "fx": 1.3385
+      },
+      "seconds": 1.57
+    },
+    {
+      "id": "q17",
+      "category": "MIXED",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "Which premium customers had a delivered order between January 10 and March 31, 2026 and then opened a refund ticket between April 1 and April 30, 2026, and what does the refund policy say about premium members?",
+      "answer": "**Premium customers who met the criteria**\n\n- Anjali\u202fGurung  \n- Daniel\u202fBrooks  \n- Mei\u202fLin\u202fChen  \n- Rohan\u202fMehta  \n- Sophie\u202fLaurent  \n\n**Refund policy for premium members**\n\nPremium members receive faster refunds.  When a returned parcel is scanned by the courier, the refund is issued immediately, without waiting for the parcel to reach the warehouse.  Premium members can also opt for instant store credit worth\u202f105\u202f% of the refund amount, and change\u2011of\u2011mind returns are free (no return\u2011shipping fee is deducted).  \n\n**Sources**\n\n- `shop database` (query_database)  \n- `refunds.md` (search_docs)",
+      "tools_used": [
+        "query_database",
+        "search_docs"
+      ],
+      "sources": [
+        {
+          "type": "database",
+          "name": "shop database",
+          "query": "SELECT DISTINCT c.full_name, c.email FROM customers c JOIN orders o ON c.id = o.customer_id JOIN support_tickets t ON c.id = t.customer_id WHERE c.plan = 'premium' AND o.status = 'delivered' AND o.order_date BETWEEN '2026-01-10' AND '2026-03-31' AND t.topic = 'refund' AND t.created_at BETWEEN '2026-04-01' AND '2026-04-30';"
+        },
+        {
+          "type": "document",
+          "name": "refunds.md",
+          "section": "Refund Policy > Refunds for Premium members"
+        },
+        {
+          "type": "document",
+          "name": "premium-membership.md",
+          "section": "Premium Membership > Cancelling"
+        },
+        {
+          "type": "document",
+          "name": "premium-membership.md",
+          "section": "Premium Membership > Benefits"
+        },
+        {
+          "type": "document",
+          "name": "returns.md",
+          "section": "Returns Policy > Who pays for return shipping"
+        },
+        {
+          "type": "document",
+          "name": "warranty.md",
+          "section": "Warranty Policy > What the warranty covers"
+        }
+      ],
+      "expected": {
+        "truth": [
+          {
+            "check": "names",
+            "values": [
+              "Anjali Gurung",
+              "Daniel Brooks",
+              "Mei Lin Chen",
+              "Rohan Mehta",
+              "Sophie Laurent"
+            ],
+            "expected_number": null
+          }
+        ],
+        "fx": null
+      },
+      "seconds": 3.93
+    },
+    {
+      "id": "q23",
+      "category": "NONE",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "Which warehouse employee packed my order from June 2, 2026?",
+      "answer": "I don\u2019t have that information.",
+      "tools_used": [],
+      "sources": [],
+      "expected": {
+        "truth": [],
+        "fx": null
+      },
+      "seconds": 0.44
+    }
+  ]
+}

@@ -11,6 +11,10 @@ The graph has two nodes and loops between them:
 A step counter caps the loop: once it reaches max_steps, the agent is
 told to answer with what it has and tools are switched off.
 
+Before each LLM call, tool results from earlier turns are swapped for a
+short placeholder (see trim_old_tool_results), so a long conversation
+doesn't resend every old search result and SQL table with each question.
+
 The state is a list of messages in OpenAI's format (plain dicts), the
 format Steadfast uses for every provider. With a checkpointer, LangGraph
 saves the state after every step under a thread_id, which is how the
@@ -67,6 +71,49 @@ def repair_history(messages: list[dict]) -> list[dict]:
     return repaired
 
 
+OLD_RESULT_PLACEHOLDER = (
+    "(Result from an earlier question, left out to save space. "
+    "Call the tool again if you need these details.)"
+)
+# Results this short (a one-row SQL answer, an exchange rate) cost a few dozen
+# tokens and are handy for follow-ups, so they are always sent in full.
+TRIM_RESULTS_OVER_CHARS = 300
+
+
+def trim_old_tool_results(messages: list[dict]) -> list[dict]:
+    """Swap tool results from earlier turns for a short placeholder.
+
+    Every message in a thread is sent again with each new question, and
+    tool results are by far the biggest part (search hits, SQL tables).
+    Left alone, a long conversation grows until it hits the model's token
+    limit and uses up the free-tier token budget. The answers the agent
+    gave in earlier turns stay, so follow-up questions still have the
+    facts; only the raw results behind them are left out. The current turn
+    (everything after the last user message) is sent untouched, because
+    the agent is still working with those results. Short results are kept
+    too (see TRIM_RESULTS_OVER_CHARS).
+
+    Results are replaced, never removed, so every tool request keeps its
+    matching result (the same rule as repair_history: providers reject a
+    request without a result). The saved history is left as it is; only
+    what is sent is trimmed.
+    """
+    last_user = max((i for i, m in enumerate(messages) if m.get("role") == "user"), default=-1)
+    trimmed: list[dict] = []
+    for i, message in enumerate(messages):
+        content = message.get("content")
+        if (
+            i < last_user
+            and message.get("role") == "tool"
+            and isinstance(content, str)
+            and len(content) > TRIM_RESULTS_OVER_CHARS
+        ):
+            trimmed.append({**message, "content": OLD_RESULT_PLACEHOLDER})
+        else:
+            trimmed.append(message)
+    return trimmed
+
+
 class AgentState(TypedDict):
     # operator.add means "append": each node returns only its new messages.
     messages: Annotated[list[dict], operator.add]
@@ -86,7 +133,7 @@ def build_graph(
 
     async def agent_node(state: AgentState) -> dict:
         steps = state.get("steps", 0)
-        history = repair_history(state["messages"])
+        history = trim_old_tool_results(repair_history(state["messages"]))
         messages = [{"role": "system", "content": load_prompt(prompt_version)}, *history]
 
         if steps >= max_steps:

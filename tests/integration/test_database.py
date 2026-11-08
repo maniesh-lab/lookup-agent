@@ -209,6 +209,41 @@ def test_search_modes(seeded_db, ingested, mode):
     assert hits and hits[0].source == "returns.md"
 
 
+def test_search_without_a_connection_uses_the_shared_pool(seeded_db, ingested, monkeypatch):
+    from app.db import search_pool
+
+    monkeypatch.setattr(settings, "database_url", seeded_db["url"])
+    question = "who pays for return shipping when you sent the wrong item"
+
+    def ask():
+        hits = search(question, mode="rerank", k=3, embedder=FakeEmbedder(), reranker=FakeReranker())
+        assert hits and hits[0].source == "returns.md"
+
+    ask()  # opens the pool
+    opened = search_pool().get_stats()["connections_num"]
+    ask()
+    ask()
+    stats = search_pool().get_stats()
+    assert stats["connections_num"] == opened  # later searches reuse pooled connections
+    assert stats["pool_available"] == stats["pool_size"]  # and hand them back
+
+
+def test_search_hands_the_connection_back_before_reranking(seeded_db, ingested, monkeypatch):
+    from app.db import search_pool
+
+    monkeypatch.setattr(settings, "database_url", seeded_db["url"])
+    seen = []
+
+    class WatchingReranker(FakeReranker):
+        def score(self, query, texts):
+            stats = search_pool().get_stats()
+            seen.append(stats["pool_available"] == stats["pool_size"])
+            return super().score(query, texts)
+
+    search("return shipping", mode="rerank", k=3, embedder=FakeEmbedder(), reranker=WatchingReranker())
+    assert seen == [True]  # no connection was checked out while the reranker ran
+
+
 # --- The agent with real tools and a real checkpointer ----------------------------------
 
 
