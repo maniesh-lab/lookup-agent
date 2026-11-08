@@ -33,7 +33,7 @@ flowchart LR
     agent --> C[convert_currency] --> fx[(Frankfurter API)]
 ```
 
-The agent loops between the LLM and the tools until it has an answer, with a step cap so it can't loop forever. Conversations are saved in Postgres per `thread_id`. LLM calls go through [Steadfast](https://github.com/maniesh-lab/steadfast), my reliability layer for LLM APIs (retries, rate limits, provider fallback, token counts). The full design is in [docs/architecture.md](docs/architecture.md).
+The agent loops between the LLM and the tools until it has an answer, with a step cap so it can't loop forever. Conversations are saved in Postgres per `thread_id`; before each LLM call, tool results from earlier turns are swapped for a short placeholder, so a long conversation doesn't resend every old search result and SQL table. LLM calls go through [Steadfast](https://github.com/maniesh-lab/steadfast), my reliability layer for LLM APIs (retries, rate limits, provider fallback, token counts). The full design is in [docs/architecture.md](docs/architecture.md).
 
 ## Results
 
@@ -45,7 +45,7 @@ The agent loops between the LLM and the tools until it has an answer, with a ste
 | Hybrid (vector + keyword, RRF) | 100% (26/26) | 0.97 |
 | Hybrid + reranker | 100% (26/26) | 0.96 |
 
-**Agent** (`python -m eval.run_eval`, scored by rules, see `eval/scoring.py`), measured with `openai/gpt-oss-20b`, a small model on Groq's free tier, 41 questions per run, one run per prompt version (v1 on 2026-10-24, v2 with its current rules on 2026-10-25):
+**Agent** (`python -m eval.run_eval`, scored by rules, see `eval/scoring.py`), measured with `openai/gpt-oss-20b`, a small model on Groq's free tier, 41 questions per run, one run per prompt version (v1 on 2026-10-24, v2 with its current rules on 2026-10-25). The default prompt is now **v3** (v2 plus one rule, see below); it has only had a partial run so far.
 
 | | Prompt v1 | Prompt v2 |
 |---|---|---|
@@ -59,7 +59,7 @@ The agent loops between the LLM and the tools until it has an answer, with a ste
 How to read this:
 
 - **The rule-based checks barely separate the prompts on this set.** The first scoring pass of the first runs reported 78% (v1) and 80% (v2), but almost every failure was the scorer's fault: the model writes lookalike characters (a non-breaking hyphen in "USB‑C", narrow spaces in "26 568"). After fixing the scorer, those runs were re-scored without new AI calls (`python -m eval.rescore`) and both passed 41/41.
-- **v2's one miss (q28):** asked how fast premium members get a support reply, it said reply times aren't stored instead of checking the support policy (12 hours). The same question passed in v2's previous run, so this is run-to-run variation in a small free model rather than a gap in the prompt.
+- **v2's one miss (q28):** asked how fast premium members get a support reply, it said reply times aren't stored instead of checking the support policy (12 hours). The same question passed in v2's previous run, so it may be run-to-run variation, but the likely trigger was v2's "when the data doesn't exist" rule being applied to a docs question. Prompt v3 adds one rule for that (see below).
 - **The real differences only show up when reading the answers.** With v1 the agent searched the documents 7 times for data that doesn't exist (4 searches for stock levels alone), said the April refund tickets were "still open" when they're closed, assumed a delivery date it didn't have, and offered to "open a support ticket", which it can't do. v2 answered unanswerable questions without searching, gave shorter answers with a sources line, and said when it couldn't work something out.
 - **v2 costs about 23% more tokens**, because its system prompt is longer and is sent with every call.
 - **Search is saturated too.** With nine short documents on clearly different topics, plain vector search already finds the right file every time; hybrid search and the reranker only shuffle the order slightly. They would matter on a bigger or messier document set.
@@ -82,6 +82,21 @@ How to read this:
 - The v1 numbers are after re-scoring: the first pass marked a correct "there's no toys category" answer as wrong because of its wording, and the scorer's phrase list was extended.
 - Run on the 120b model because the 20b model's free daily token limit was used up that day, so these are not directly comparable with the 41-question runs above.
 
+**Prompt v3, partial run** (2026-11-08). v3 is v2 plus one rule: questions about how the shop works (time frames, reply or delivery times, what members get) go to `search_docs` before the agent says the information isn't available, while data that really doesn't exist (costs, stock, staff, website visits) still gets no search. To keep Groq's free tokens for the rest, it was run only on the cases that rule could help or hurt, plus a few others:
+
+| Cases (model) | Prompt v2 (saved runs) | Prompt v3 |
+|---|---|---|
+| q28, the docs question v2 missed (20b) | 0/1 | 1/1 (searched, answered 12 hours) |
+| NONE, data that doesn't exist: q22-q25, q41 (20b) | 5/5 | 5/5 |
+| One per category: q01 DOCS, q08 DB, q14 API, q17 MIXED, q23 NONE (20b) | 5/5 | 5/5 |
+| Hard set TRAP: h01-h03, h14, h15 (120b) | 5/5 | 5/5 |
+| Hard set FOLLOWUP: h06, h07 (120b) | 2/2 | 2/2 |
+
+- **Not a full run**: 17 of the 56 questions (q23 is in two rows and was run twice, passing both times). The v2 column is from v2's saved runs of the same cases.
+- **Two v3 passes are after re-scoring.** The first scoring marked q22 ("does not contain cost, profit, or margin information, so I can't calculate or provide…") and h02 ("did not have any order recorded") as wrong, though both are correct refusals. The phrase lists got "does not contain", "can't calculate" and "not have any order", and both runs were re-scored without new AI calls. The new phrases change no saved v1 or v2 result.
+- **The new rule caused no extra document searches** on the NONE and TRAP cases (one search on q41, the same as v2). v3 made three more database calls than v2 on the hard set TRAP cases (7 against 4: three queries on h02 instead of one, one on h15 instead of none).
+- The FOLLOWUP cases also ran with the conversation trimming (earlier tool results replaced by a placeholder) and still passed.
+
 **What the evals changed.** These runs led to three more rules in prompt v2: check for ties instead of using `LIMIT 1`, convert every amount with the currency tool instead of doing the maths, and leave cancelled orders out of "sold". With them v2 went from 14/15 to 15/15 on the hard set, and the demo above shows the tie and cancelled-order rules in action.
 
 Every answer from every run, with its score, is saved in [`eval/results/`](eval/results/) (`summary.md` and `summary-hard.md` list the runs).
@@ -97,9 +112,9 @@ cp .env.example .env          # then put your key after GROQ_API_KEY=
 docker compose up --build
 ```
 
-The first start builds the database (tables, fake shop data, policy search index) and downloads the search models, so it takes a few minutes. Then:
+The first start builds the database (tables, fake shop data, policy search index) and downloads the search models, so it takes a few minutes. Later starts load the models from the `models` volume at startup, in a few seconds. Then:
 
-- **Chat page:** open http://localhost:8000 and ask a question, or pick one of the suggestions. Each answer shows which sources were checked, in order, and the details underneath (the policy section, the SQL that ran, or the exchange rate). Press the stop button (or Esc) to cancel a question while it's being answered; the server stops working on it too. Light and dark mode follow your system, or switch with the button in the corner.
+- **Chat page:** open http://localhost:8000 and ask a question, or pick one of the suggestions. Each answer shows which sources were checked, in order, and the details underneath (the policy section, the SQL that ran, or the exchange rate). Press the stop button (or Esc) to cancel a question while it's being answered; the server stops working on it too. Light and dark mode follow your system, or switch with the button in the corner. If the server asks for an API key or a client sends too many questions, the page says so in a short notice instead of a generic error.
 - **API:** open http://localhost:8000/docs and try `POST /chat`:
 
 ```json
@@ -137,7 +152,7 @@ python -m scripts.try_tools fx 250 EUR INR
 |---|---|---|
 | `GET` | `/` | The chat page |
 | `GET` | `/health` | `{"status": "ok"}` |
-| `POST` | `/chat` | Ask a question. Body: `message`, optional `thread_id` |
+| `POST` | `/chat` | Ask a question. Body: `message`, optional `thread_id`. Needs `X-API-Key` if `CHAT_API_KEY` is set (401 if missing or wrong). 429 with a `Retry-After` header after `CHAT_RATE_LIMIT_PER_MINUTE` questions from one IP in 60 seconds |
 | `POST` | `/ingest` | Re-index the policy documents (unchanged files are skipped). Needs `X-Ingest-Token` if `INGEST_TOKEN` is set |
 
 Every response carries an `X-Request-ID` header. The same id is on every log line for that request.
@@ -171,7 +186,25 @@ With a free [Langfuse](https://langfuse.com) account, set `LANGFUSE_PUBLIC_KEY`,
 
 ![A Langfuse trace of one question: an LLM call, a search_docs call, then the LLM call that writes the answer](docs/images/langfuse-trace.png)
 
-In this trace the document search took 7.8 s of the 9.1 s total, while both LLM calls took under a second, so search is the step to speed up first.
+In this trace the document search took 7.8 s of the 9.1 s total, while both LLM calls took under a second, so search was the step to speed up first.
+
+**Search timings, before and after** (2026-11-08, measured stage by stage on CPU, `SEARCH_MODE=rerank`; 3 cold runs and 10 warm searches each):
+
+| | Before | After |
+|---|---|---|
+| Importing torch and sentence-transformers | 3,294 ms, during the first question | about 2,800 ms, at server startup |
+| Loading the two models | 9,928 ms, during the first question | 539 ms, at server startup |
+| First search after a start (not counting the import) | 10,568 ms, model loading included | 206 ms |
+| Warm search (median) | 212 ms | 200 ms |
+| Getting a database connection (warm) | 10.4 ms | 0.8 ms |
+| Reranker (warm, per search) | 182 ms | 181 ms |
+
+The import was timed on its own, before the first search, so it isn't inside the other rows. In total, a fresh server used to spend about 14 s on search during its first question; it now spends about 3.5 s at startup (4.6 s in the Docker container) and about 0.2 s per question.
+
+- **The slow part was loading, not searching.** About 9.6 s of the first search was the Hugging Face library checking online for newer versions of two models that were already downloaded: a test run with the library set to offline cut the first search from 10.4 s to 0.75 s. Models now load from the local cache first (and download only when missing), and the server loads them at startup instead of during the first question. The trade-off: a newer upstream revision of a model is only picked up after its cached copy is deleted.
+- **Search connections come from a pool** instead of a new connection per search, and each search hands its connection back before reranking.
+- **The reranker is now about 90% of a warm search.** `SEARCH_MODE=hybrid` would skip it; on these nine short documents hybrid search already finds the right file every time (see Results), but the default stays `rerank`.
+- Retrieval hit rates are unchanged after the change (100% on all three layers).
 
 ## Tests
 
@@ -189,13 +222,13 @@ The integration tests rebuild the tables in the database you point them at, so u
 ```
 app/
   main.py              FastAPI app: /, /health, /chat, /ingest, correlation ids
-  db.py                Postgres connection helpers (owner and read-only user)
+  db.py                Postgres connection helpers (owner and read-only user) and the search pool
   static/index.html    the chat page (one file, no build step)
-  agent/               LangGraph graph, runner (answer + sources), prompts/v1.txt, v2.txt
+  agent/               LangGraph graph, runner (answer + sources), prompts/v1.txt, v2.txt, v3.txt
   tools/               search_docs, query_database, convert_currency, registry
   retrieval/           chunking, ingestion, vector / hybrid / rerank search
   services/llm.py      LLM client on Steadfast
-  core/                settings, JSON logging, Langfuse tracing
+  core/                settings, JSON logging, Langfuse tracing, the /chat rate limit
 db/                    schema.sql, seed.py (repeatable fake shop data)
 data/policies/         the nine policy documents
 eval/                  test set, scorer, eval runners, re-scorer, results
@@ -207,17 +240,25 @@ CHANGELOG.md           what was built and changed
 
 ## Settings
 
-All settings come from `.env` (see `.env.example`). The main ones: `LLM_PROVIDER` (`groq` or `openai`, the other one becomes the fallback when its key is set), `LLM_MODEL` (the Groq model; with `LLM_PROVIDER=openai` the model is `OPENAI_MODEL`), `PROMPT_VERSION`, `MAX_AGENT_STEPS`, `SEARCH_MODE` (`vector`, `hybrid` or `rerank`), and the optional Langfuse keys for tracing. Less common settings (SQL timeout and row limit, search models, rate limit, temperature) have defaults in `app/core/config.py` and can be overridden the same way.
+All settings come from `.env` (see `.env.example`). The main ones: `LLM_PROVIDER` (`groq` or `openai`, the other one becomes the fallback when its key is set), `LLM_MODEL` (the Groq model; with `LLM_PROVIDER=openai` the model is `OPENAI_MODEL`), `PROMPT_VERSION` (default `v3`), `MAX_AGENT_STEPS`, `SEARCH_MODE` (`vector`, `hybrid` or `rerank`), and the optional Langfuse keys for tracing.
+
+Two settings protect `POST /chat`:
+
+- `CHAT_API_KEY`: when set, every question needs the header `X-API-Key` with this value; a missing or wrong key gets 401. Empty by default, so the chat page and the Docker quick start work without one. The chat page never holds a key, so with a key set it shows "This server needs an API key" and only your own clients can ask.
+- `CHAT_RATE_LIMIT_PER_MINUTE` (default 20): questions per client IP in any 60 seconds; over the limit gets 429 with a "Slow down" message and a `Retry-After` header, before any LLM call. `0` turns it off. Its limits are listed under Known limitations.
+
+Less common settings (SQL timeout and row limit, search models, the LLM calls-per-minute limit, temperature) have defaults in `app/core/config.py` and can be overridden the same way.
 
 ## Known limitations
 
 - Exchange rates are European Central Bank reference rates, published once per working day, so "today's rate" is the latest published one (the answer shows its date).
 - The fake shop data covers January to June 2026 only, and all prices are in USD.
-- Eval answer checks are simple text rules (a number, names or key phrases must appear). They can miss a correct answer worded in an unexpected way (this happened twice on the hard set), and they don't catch an extra wrong claim inside an otherwise correct answer.
+- Eval answer checks are simple text rules (a number, names or key phrases must appear). They can miss a correct answer worded in an unexpected way (this happened three times on the hard set), and they don't catch an extra wrong claim inside an otherwise correct answer.
 - Each result comes from one run of one model. The hard set is only 15 questions, so one question is about 7 points.
-- Long conversations grow until they hit the model's token limit: every earlier message and tool result in a thread is sent again with each question.
+- Earlier questions and answers in a thread are still sent with every question (only the old tool results are replaced by a placeholder), so a very long conversation still grows. A follow-up that needs the raw data behind an old answer makes the agent call the tool again.
 - The eval's "must not mention" checks are plain text matches, so a correct refusal like "no orders were deleted" can fail on "were deleted".
-- `/chat` has no auth or rate limit, so don't expose it publicly without adding them.
+- The `/chat` rate limit is kept in memory: the counts reset when the server restarts, and it only works for a single server process (with several workers or containers, each counts on its own). Clients are told apart by IP, so behind a reverse proxy every request looks like the proxy's IP, and all users share one limit, unless uvicorn is told to trust the proxy's forwarded headers (`--forwarded-allow-ips=<proxy address>`). With Docker port publishing, requests can also arrive from the Docker gateway's IP. For several processes, a shared store like Redis would be needed.
+- The API key is one shared key, not per-user accounts.
 
 ## License
 

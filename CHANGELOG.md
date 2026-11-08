@@ -9,7 +9,7 @@ First full version.
 - **Documents**: nine policy files in `data/policies/` (returns, refunds, shipping, premium membership, warranty, damaged items, order changes, payments, support).
 - **Search**: ingestion that chunks each policy by section, embeds it (`BAAI/bge-small-en-v1.5`) and stores it in pgvector, skipping unchanged files. Three search layers: vector, hybrid (vector + full-text, merged with Reciprocal Rank Fusion) and hybrid + cross-encoder reranker.
 - **Tools**: `search_docs`, `query_database` (single SELECT only, read-only user, 5 s timeout, 100-row limit) and `convert_currency` (Frankfurter exchange-rate API, timeout, clean error messages).
-- **Agent**: LangGraph graph (agent node and tools node) with a step cap, conversation memory in Postgres per `thread_id`, versioned system prompts (`v1`, `v2`), and a sources list on every answer.
+- **Agent**: LangGraph graph (agent node and tools node) with a step cap, conversation memory in Postgres per `thread_id`, versioned system prompts (`v1`, `v2`, later `v3`), and a sources list on every answer.
 - **LLM calls** through [Steadfast](https://github.com/maniesh-lab/steadfast) 0.3: retries, rate limits, Groq with OpenAI as fallback, token counts.
 - **API**: `GET /health`, `POST /chat`, `POST /ingest` (optional token). Every request gets a correlation id that appears on all its JSON log lines and in the `X-Request-ID` header. `/chat` returns 503 when every LLM provider is down.
 - **Tracing**: optional Langfuse traces with the prompt version on each trace.
@@ -74,6 +74,18 @@ First full version.
 - Docker: the Postgres healthcheck checks over TCP (the image's first-start server only listens on a socket), Postgres is published on 127.0.0.1 only, and the app container restarts if it exits.
 - The eval scorer counted the digits of dates ("2026-02-18") as numbers in answers. Re-checked offline: no saved result changes.
 - Removed the unused `embedding_dim` setting.
+
+### Changed: shorter conversations, faster search, a protected /chat, prompt v3 (2026-11-08)
+- **Long conversations are trimmed before each LLM call.** Tool results from earlier turns (over 300 characters) are replaced by a short placeholder in what is sent; the current turn, the earlier answers and the saved history are left as they are, and every tool request keeps its result. Follow-up questions still work (checked with the hard-set FOLLOWUP cases and a 4-turn conversation in Docker).
+- **Search is faster.** Measured first: the first search after a start took 10.6 s, 9.6 s of it the Hugging Face library checking online for newer versions of models already on disk. Models now load from the local cache first (downloading only when missing), the server loads them and opens the search pool at startup, and search uses a shared connection pool (pgvector types registered) that it hands back before reranking. First search after a start (not counting the torch import, which now also happens at startup): 10,568 ms to 206 ms; startup now spends about 3.5 s on it instead. Warm search 212 ms to 200 ms (the reranker is about 180 ms of it). Retrieval hit rates unchanged.
+- **Optional API key on `/chat`** (`CHAT_API_KEY`, header `X-API-Key`, 401 when missing or wrong) and an **in-memory per-IP rate limit** (`CHAT_RATE_LIMIT_PER_MINUTE`, default 20 per sliding 60 seconds, 429 with `Retry-After`, no new dependency). Both run before the agent. The chat page shows short notices for 401 and 429.
+- **Prompt v3** is the new default: v2 plus one rule sending how-the-shop-works questions to `search_docs` before saying the information isn't available, without searching for data that doesn't exist. Partial run: q28 (v2's miss), the NONE cases, one case per category, the hard-set TRAP and FOLLOWUP cases, 17/17 after re-scoring. v1 and v2 unchanged.
+
+### Fixed (2026-11-08)
+- A non-ASCII `X-Ingest-Token` header caused a 500 instead of a 401 (secrets are now compared as bytes; the same goes for `X-API-Key`).
+- Scripts and evals that search printed a shutdown error on Python 3.14; the search pool now closes at exit.
+- The eval scorer missed two correct refusal wordings ("does not contain ... can't calculate", "did not have any order"). Added to the phrase lists; no saved v1 or v2 result changes.
+- `docker compose up --build` checked end to end on 2026-11-08: DOCS, DB and MIXED questions, a 4-turn conversation, 401 and 429, and the chat page (asking, follow-ups, Stop, both notices). The demo GIF's three questions still give the same answers with v3.
 
 ### Not done yet
 - Live deploy

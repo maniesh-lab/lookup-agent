@@ -12,7 +12,7 @@ eval/run_retrieval_eval.py measures the hit rate of each layer.
 
 Connections come from a shared pool (app.db.search_pool) unless a caller
 passes its own, and the models are loaded once (app.retrieval.models).
-Per search, the reranker is the slow step: about 180 of 210 ms.
+Per search, the reranker is the slow step: about 180 of 200 ms.
 """
 
 import re

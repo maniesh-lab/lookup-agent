@@ -40,12 +40,12 @@ flowchart LR
 
 ## One request, step by step
 
-1. **FastAPI** receives `POST /chat` (from the chat page at `/`, or from any other client) with a message and an optional `thread_id`. A middleware gives the request a correlation id (or keeps the caller's `X-Request-ID`) and binds it to every log line, including Steadfast's logs of each LLM call.
-2. **The agent node** sends the system prompt (`app/agent/prompts/v2.txt`), the conversation so far and the three tool descriptions to the LLM through **Steadfast**.
+1. **FastAPI** receives `POST /chat` (from the chat page at `/`, or from any other client) with a message and an optional `thread_id`. A middleware gives the request a correlation id (or keeps the caller's `X-Request-ID`) and binds it to every log line, including Steadfast's logs of each LLM call. Before the body is handled, the per-IP rate limit (`CHAT_RATE_LIMIT_PER_MINUTE`, 429 when over) and, if `CHAT_API_KEY` is set, the `X-API-Key` check (401) run, so a refused request never reaches the agent.
+2. **The agent node** sends the system prompt (`app/agent/prompts/v3.txt` by default), the conversation so far and the three tool descriptions to the LLM through **Steadfast**.
 3. If the model asks for tools, **the tools node** runs each one (in a thread, so the server isn't blocked) and adds the results to the conversation. Bad arguments, SQL errors and API failures come back to the model as short error messages it can act on, never as crashes.
 4. Steps 2 and 3 repeat until the model answers in plain text. A **step cap** (`MAX_AGENT_STEPS`, default 6) stops a loop: at the cap, tools are switched off and the model is told to answer with what it has.
-5. If the caller hangs up while the agent is working (the chat page's Stop button, or a closed tab), `/chat` notices within half a second and cancels the run, so no more LLM calls are made. Before every LLM call, unfinished tool steps left by a stopped run are dropped from what is sent, so the conversation can carry on.
-6. The **checkpointer** saves the conversation in Postgres under its `thread_id`, so sending the same `thread_id` again continues the conversation, even after a restart.
+5. If the caller hangs up while the agent is working (the chat page's Stop button, or a closed tab), `/chat` notices within half a second and cancels the run, so no more LLM calls are made. Before every LLM call, unfinished tool steps left by a stopped run are dropped from what is sent, so the conversation can carry on, and tool results from earlier turns (over 300 characters) are swapped for a short placeholder, so a long conversation doesn't resend every old result. The earlier answers stay, which is what follow-ups need.
+6. The **checkpointer** saves the conversation in Postgres under its `thread_id` (with the full tool results; only what is sent is trimmed), so sending the same `thread_id` again continues the conversation, even after a restart.
 7. The runner collects the answer, which tools were used, and a **sources** list built from the tool results (policy file and section, the SQL that ran, the exchange rate and its date).
 
 ## The pieces
@@ -57,6 +57,7 @@ flowchart LR
   1. *vector*: nearest chunks by cosine distance (pgvector, HNSW index)
   2. *hybrid*: vector results plus Postgres full-text search, merged with Reciprocal Rank Fusion
   3. *rerank*: the hybrid top 20 re-scored by a cross-encoder (`ms-marco-MiniLM-L-6-v2`)
+- **Speed**: the server loads both models (from the local cache first, so there is no online version check) and opens a pool of search connections at startup. A search takes its connection from the pool, runs the two SQL queries and hands it back before reranking. Measured on 2026-11-08, the first search after a start went from 10.6 s to about 0.2 s; a warm search takes about 200 ms, of which the reranker is about 180 ms.
 
 ### The SQL tool (`app/tools/query_database.py`)
 
@@ -88,7 +89,7 @@ Built on [Steadfast](https://github.com/maniesh-lab/steadfast), a reliability la
 ### Observability
 
 - **Logs**: one JSON object per line (structlog), every line tagged with the request's correlation id.
-- **Traces** (optional): with Langfuse keys set, each chat turn is a trace with one child per LLM call and per tool call. The prompt version is stored on every trace as its version, a tag and metadata, so v1 and v2 runs can be compared.
+- **Traces** (optional): with Langfuse keys set, each chat turn is a trace with one child per LLM call and per tool call. The prompt version is stored on every trace as its version, a tag and metadata, so runs with different prompt versions can be compared.
 
 ## Design choices
 
@@ -96,3 +97,4 @@ Built on [Steadfast](https://github.com/maniesh-lab/steadfast), a reliability la
 - **Tools return text, never raise**: the model can read an error and retry, which matters most for SQL.
 - **Truth computed at eval time**: changing the seed can't silently break the expected answers.
 - **Separate read-only database user** instead of trusting a keyword filter alone.
+- **A hand-written in-memory rate limit** instead of a new dependency or Redis: enough for one server process. It resets on restart, counts per process, and needs uvicorn's `--forwarded-allow-ips` behind a reverse proxy to see real client IPs.

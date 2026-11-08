@@ -3,8 +3,8 @@
 When LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY are set, every chat turn
 becomes a trace in Langfuse, with one child observation per LLM call and
 per tool call. The prompt version is stored on every trace (as its
-version and in its metadata), so runs with prompt v1 and v2 can be
-compared side by side.
+version and in its metadata), so runs with different prompt versions
+can be compared side by side.
 
 Without the keys every function here does nothing, so the app runs the
 same with or without a Langfuse account.
