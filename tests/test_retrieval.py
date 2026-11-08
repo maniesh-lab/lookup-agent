@@ -76,7 +76,7 @@ def test_keyword_query_ors_words():
 
 
 def test_prompts_load():
-    assert available_versions() == ["v1", "v2"]
+    assert available_versions() == ["v1", "v2", "v3"]
     assert "Today's date is 2026-01-02" in load_prompt("v1", today=__import__("datetime").date(2026, 1, 2))
 
 

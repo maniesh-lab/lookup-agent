@@ -1,0 +1,175 @@
+{
+  "set": "main",
+  "prompt": "v3",
+  "model": "openai/gpt-oss-20b",
+  "provider": "groq",
+  "tokens": 12338,
+  "rate_date": "2026-11-06",
+  "records": [
+    {
+      "id": "q22",
+      "category": "NONE",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "What was the shop's profit margin for the first quarter of 2026?",
+      "answer": "I\u2019m sorry, but the shop\u2019s database does not contain cost, profit, or margin information, so I can\u2019t calculate or provide the profit margin for any period. I can, however, give you revenue or order totals if that would be helpful.  \n\nSources: none.",
+      "tools_used": [],
+      "sources": [],
+      "expected": {
+        "truth": [],
+        "fx": null
+      },
+      "seconds": 0.71
+    },
+    {
+      "id": "q23",
+      "category": "NONE",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "Which warehouse employee packed my order from June 2, 2026?",
+      "answer": "I don\u2019t have that information. The shop database does not record which employee packed an order.",
+      "tools_used": [],
+      "sources": [],
+      "expected": {
+        "truth": [],
+        "fx": null
+      },
+      "seconds": 0.68
+    },
+    {
+      "id": "q24",
+      "category": "NONE",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "Will the Blue Ridge smartwatch be back in stock before the end of July 2026?",
+      "answer": "I don\u2019t have any information on stock levels or restock dates for the Blue Ridge smartwatch. I can\u2019t confirm whether it will be back in stock before the end of July\u202f2026. If you\u2019d like, I can check for any related support tickets or product listings, but that won\u2019t reveal restock timing.  \n\nSources: shop database (no stock data)",
+      "tools_used": [],
+      "sources": [],
+      "expected": {
+        "truth": [],
+        "fx": null
+      },
+      "seconds": 0.7
+    },
+    {
+      "id": "q25",
+      "category": "NONE",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "how many people visited the website on March 15, 2026?",
+      "answer": "I don\u2019t have any data on website visits.",
+      "tools_used": [],
+      "sources": [],
+      "expected": {
+        "truth": [],
+        "fx": null
+      },
+      "seconds": 0.66
+    },
+    {
+      "id": "q28",
+      "category": "DOCS",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "How quickly do premium members get a reply from support?",
+      "answer": "Premium members receive priority support, with replies to tickets within **12 hours**.  \n\nSources: `support.md`, `warranty.md`, `premium-membership.md`",
+      "tools_used": [
+        "search_docs"
+      ],
+      "sources": [
+        {
+          "type": "document",
+          "name": "support.md",
+          "section": "Customer Support > Response times"
+        },
+        {
+          "type": "document",
+          "name": "warranty.md",
+          "section": "Warranty Policy > How to make a claim"
+        },
+        {
+          "type": "document",
+          "name": "premium-membership.md",
+          "section": "Premium Membership > Benefits"
+        },
+        {
+          "type": "document",
+          "name": "premium-membership.md",
+          "section": "Premium Membership > If a monthly payment fails"
+        },
+        {
+          "type": "document",
+          "name": "premium-membership.md",
+          "section": "Premium Membership > Cancelling"
+        }
+      ],
+      "expected": {
+        "truth": [],
+        "fx": null
+      },
+      "seconds": 5.71
+    },
+    {
+      "id": "q41",
+      "category": "NONE",
+      "passed": true,
+      "tools_ok": true,
+      "sources_ok": true,
+      "answer_ok": true,
+      "failures": [],
+      "question": "Who is the CEO of Lumen Lane?",
+      "answer": "I don\u2019t have that information.",
+      "tools_used": [
+        "search_docs"
+      ],
+      "sources": [
+        {
+          "type": "document",
+          "name": "refunds.md",
+          "section": "Refund Policy > Refunds for Premium members"
+        },
+        {
+          "type": "document",
+          "name": "warranty.md",
+          "section": "Warranty Policy > Gifts"
+        },
+        {
+          "type": "document",
+          "name": "premium-membership.md",
+          "section": "Premium Membership > Overview"
+        },
+        {
+          "type": "document",
+          "name": "warranty.md",
+          "section": "Warranty Policy > What the warranty covers"
+        },
+        {
+          "type": "document",
+          "name": "warranty.md",
+          "section": "Warranty Policy > What the warranty does not cover"
+        }
+      ],
+      "expected": {
+        "truth": [],
+        "fx": null
+      },
+      "seconds": 1.29
+    }
+  ],
+  "rescored": true
+}

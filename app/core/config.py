@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.0
 
     # Agent
-    prompt_version: str = "v2"
+    prompt_version: str = "v3"
     max_agent_steps: int = 6
 
     # Search

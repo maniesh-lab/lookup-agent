@@ -178,7 +178,7 @@ async def test_bad_tool_arguments_go_back_to_the_model():
     assert result.sources == []  # failed tools are not listed as sources
 
 
-@pytest.mark.parametrize("version", ["v1", "v2"])
+@pytest.mark.parametrize("version", ["v1", "v2", "v3"])
 async def test_prompt_version_is_used(version):
     llm = FakeLLM([text_reply("ok")])
     agent = make_agent(llm, fake_registry([]), version=version)
@@ -186,7 +186,8 @@ async def test_prompt_version_is_used(version):
     result = await agent.ask("hello")
 
     system = llm.calls[0]["messages"][0]["content"]
-    assert ("Pick the right source" in system) == (version == "v2")
+    assert ("Pick the right source" in system) == (version != "v1")
+    assert ("how the shop works" in system) == (version == "v3")
     assert result.prompt_version == version
 
 
