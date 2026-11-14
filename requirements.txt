@@ -15,6 +15,6 @@ langfuse>=5,<6                    # tracing (optional at runtime)
 
 # Development
 pytest>=8.3
-pytest-asyncio>=0.24
+pytest-asyncio>=1.4.1.post1
 pytest-cov>=5.0
 ruff>=0.6
