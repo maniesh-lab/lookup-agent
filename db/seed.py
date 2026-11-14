@@ -1,7 +1,7 @@
 """
 Fill the shop tables with fake but realistic data.
 
-Run from the project root (after db/schema.sql is loaded):
+Run from the project root (after db/schema.sql is loaded), or let scripts.setup_db do it:
     python -m db.seed
 
 The data is the same on every run: every random choice comes from one
@@ -519,6 +519,9 @@ def write(shop: Shop, conn) -> str:
             " VALUES (%s, %s, %s, %s, %s, %s, %s)",
             [tuple(t) for t in shop.tickets],
         )
+        # Dates are part of the text being hashed; fix their format so the
+        # fingerprint doesn't depend on the server's DateStyle setting.
+        cur.execute("SET LOCAL datestyle = 'ISO, YMD'")
         cur.execute(FINGERPRINT_SQL)
         fingerprint = cur.fetchone()[0]
     conn.commit()

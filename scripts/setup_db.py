@@ -1,19 +1,28 @@
 """
-Set up the database in one go: schema, seed data, then policy ingestion.
+Set up the database in one go: schema, seed data, the read-only user, then policy ingestion.
 
-    python -m scripts.setup_db              # rebuild everything (wipes the data)
+    python -m scripts.setup_db              # build an empty database (refuses one that has data)
+    python -m scripts.setup_db --reset      # wipe the shop data and build it again
     python -m scripts.setup_db --if-empty   # only build if the shop data isn't there yet;
                                             # otherwise just re-ingest changed policy files
     python -m scripts.setup_db --skip-ingest
+
+Every run also applies db/roles.sql (the read-only user's rules). It touches
+no data, so rule changes reach a database that already exists, for example
+the Docker volume, whose start uses --if-empty. Conversation memory is in
+its own tables, which neither file drops.
 """
 
 import argparse
+import sys
 from pathlib import Path
 
 from app.core.config import settings
 from app.db import connect
 
-SCHEMA = Path(__file__).resolve().parent.parent / "db" / "schema.sql"
+DB_DIR = Path(__file__).resolve().parent.parent / "db"
+SCHEMA = DB_DIR / "schema.sql"
+ROLES = DB_DIR / "roles.sql"
 
 
 def data_exists() -> bool:
@@ -27,26 +36,35 @@ def data_exists() -> bool:
         return cur.fetchone()[0]
 
 
-def apply_schema() -> None:
+def apply_sql(path: Path) -> None:
     with connect() as conn:
-        conn.execute(SCHEMA.read_text(encoding="utf-8"))
+        conn.execute(path.read_text(encoding="utf-8"))
         conn.commit()
-    print("Schema loaded.")
+    print(f"Loaded {path.name}.")
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument("--if-empty", action="store_true")
+    when = parser.add_mutually_exclusive_group()
+    when.add_argument("--if-empty", action="store_true", help="keep existing shop data")
+    when.add_argument("--reset", action="store_true", help="wipe existing shop data and rebuild it")
     parser.add_argument("--skip-ingest", action="store_true")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
-    if args.if_empty and data_exists():
+    has_data = data_exists()
+    if has_data and args.if_empty:
         print("Shop data already exists; keeping it.")
+    elif has_data and not args.reset:
+        sys.exit(
+            "The database already has shop data. Run again with --reset to wipe and rebuild it, "
+            "or with --if-empty to keep it."
+        )
     else:
         from db import seed
 
-        apply_schema()
+        apply_sql(SCHEMA)
         seed.main()
+    apply_sql(ROLES)
 
     if not args.skip_ingest:
         from app.retrieval.ingest import ingest_folder

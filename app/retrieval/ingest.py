@@ -2,8 +2,10 @@
 
 A file is skipped when its content hasn't changed since the last run
 (same sha256), so running ingestion again is cheap. A changed file has
-its old chunks deleted and replaced. A file that was deleted from the
-folder is removed from the database too.
+its old chunks deleted and replaced. With remove_missing (the default), a
+file that is no longer in the folder is removed from the database too, so
+the folder is the whole index; pass remove_missing=False to only add and
+update.
 """
 
 import hashlib
@@ -38,6 +40,7 @@ def ingest_folder(
     *,
     embedder: Embedder | None = None,
     conn=None,
+    remove_missing: bool = True,
 ) -> IngestStats:
     folder = Path(folder or settings.policies_dir)
     files = sorted(folder.glob("*.md"))
@@ -97,7 +100,7 @@ def ingest_folder(
                 stats.chunks_written += len(chunks)
 
             # Files that were in the database but are no longer in the folder.
-            for source, (doc_id, _h) in existing.items():
+            for source, (doc_id, _h) in existing.items() if remove_missing else ():
                 cur.execute("DELETE FROM documents WHERE id = %s", (doc_id,))
                 stats.removed.append(source)
 

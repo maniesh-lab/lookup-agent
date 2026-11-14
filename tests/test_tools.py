@@ -1,13 +1,15 @@
 """Tool helpers that don't need a database or network."""
 
 import json
+from decimal import Decimal
 
 import httpx
+import psycopg
 import pytest
 from pydantic import BaseModel
 
 from app.tools.external_api import convert
-from app.tools.query_database import UnsafeQuery, check_sql
+from app.tools.query_database import MAX_ROW_BYTES, UnsafeQuery, capped_query, check_sql, run_query
 from app.tools.registry import Tool, ToolRegistry, default_registry
 
 # --- SQL guard -------------------------------------------------------------
@@ -22,6 +24,11 @@ from app.tools.registry import Tool, ToolRegistry, default_registry
         "SELECT * FROM support_tickets WHERE description LIKE '%delete my account%'",
         "SELECT created_at, updated_total FROM x",  # words that only contain 'create'/'update'
         "SELECT * FROM support_tickets WHERE description LIKE '%;%'",  # ';' inside a string is fine
+        "SELECT count(*) FROM orders -- delete this later",  # words in a comment aren't code
+        "/* top sellers */ SELECT name FROM products",
+        'SELECT "delete" FROM x',  # a quoted name, not the keyword
+        "SELECT $$a;b$$, $t$ ; $t$",  # dollar-quoted strings
+        "SELECT a$b FROM t",  # '$' inside a name doesn't start a dollar quote
     ],
 )
 def test_allowed_queries(sql):
@@ -39,11 +46,98 @@ def test_allowed_queries(sql):
         # E'\'' is a whole string; read as a plain string it would hide the DELETE
         ("WITH a AS (SELECT E'\\''), b AS (DELETE FROM orders RETURNING 1) SELECT ''", "found 'DELETE'"),
         ("SELECT * INTO copy_of_orders FROM orders", "found 'INTO'"),
+        # A quote character inside a comment, dollar quote or quoted name used to make
+        # the check think a string started, hiding the ';' of a second statement.
+        ("SELECT $$'$$; DROP TABLE orders; SELECT $$'$$", "one statement"),
+        ("SELECT 1 /* ' */ ; DELETE FROM orders; /* ' */", "one statement"),
+        ("SELECT 1 -- '\n; DELETE FROM orders --'", "one statement"),
+        ('SELECT 1 AS "\'", 2; DROP TABLE orders; SELECT 3 AS "\'"', "one statement"),
+        ("SELECT 1 --x\r; DROP TABLE orders", "one statement"),  # Postgres ends a comment at \r
+        ("SELECT $\u00e9$'$\u00e9$; DROP TABLE orders; SELECT $\u00e9$'$\u00e9$", "one statement"),
+        ("SELECT 1 /* unclosed ; DROP TABLE orders", "one statement"),
     ],
 )
 def test_blocked_queries(sql, reason):
     with pytest.raises(UnsafeQuery, match=reason):
         check_sql(sql)
+
+
+class FakeCursor:
+    def __init__(self, conn, name):
+        self.conn, self.name = conn, name
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def execute(self, sql):
+        self.conn.executed.append(sql)
+        if self.conn.error is not None:
+            raise self.conn.error
+        self.description = [type("Col", (), {"name": n})() for n in self.conn.columns]
+
+    def fetchmany(self, size):
+        return self.conn.rows[:size]
+
+
+class FakeConnection:
+    """Just enough of a psycopg connection for run_query."""
+
+    def __init__(self, columns=(), rows=(), error=None):
+        self.columns, self.rows, self.error = list(columns), list(rows), error
+        self.executed: list[str] = []
+        self.rolled_back = False
+
+    def cursor(self, name=None):
+        return FakeCursor(self, name)
+
+    def rollback(self):
+        self.rolled_back = True
+
+
+def test_run_query_reads_columns_without_running_the_query_then_caps_rows():
+    conn = FakeConnection(["name", "total"], [("Ana", Decimal("12.50"), 40), ("Bo", Decimal("3"), 40)])
+    result = run_query("SELECT name, total FROM orders", conn=conn)
+    assert result == {
+        "columns": ["name", "total"],
+        "rows": [["Ana", 12.5], ["Bo", 3.0]],
+        "row_count": 2,
+        "truncated": False,
+    }
+    describe, capped = conn.executed
+    assert describe.endswith("LIMIT 0") and "SELECT name, total FROM orders" in describe
+    assert f"<= {MAX_ROW_BYTES}" in capped and "AS q(c0, c1)" in capped
+    assert conn.rolled_back
+
+
+def test_run_query_leaves_out_oversized_rows_and_says_so():
+    conn = FakeConnection(["big"], [(None, MAX_ROW_BYTES + 1), ("small", 30)])
+    result = run_query("SELECT big FROM t", conn=conn)
+    assert result["rows"] == [["small"]] and result["rows_left_out"] == 1
+    assert "left(description, 200)" in result["note"]
+
+
+def test_run_query_marks_a_cut_result_and_shortens_long_values():
+    rows = [("x" * 5000, 5100)] + [("y", 30)] * 10
+    result = run_query("SELECT v FROM t", conn=FakeConnection(["v"], rows), row_limit=3)
+    assert result["truncated"] is True and result["row_count"] == 3
+    assert result["rows"][0][0].endswith("(cut, 5000 characters in total)")
+
+
+def test_run_query_turns_database_errors_into_messages():
+    timeout = run_query("SELECT 1", conn=FakeConnection(error=psycopg.errors.QueryCanceled()))
+    assert "was stopped" in timeout["error"]
+    denied = run_query("SELECT 1", conn=FakeConnection(error=psycopg.errors.InsufficientPrivilege("no")))
+    assert denied["error"].startswith("Database error:")
+    assert run_query("DROP TABLE orders", conn=FakeConnection())["error"].startswith("Only SELECT")
+
+
+def test_capped_query_keeps_a_trailing_comment_from_hiding_the_end():
+    sql = capped_query("SELECT 1 -- note", 1)
+    assert "SELECT 1 -- note\n)" in sql
+    assert capped_query("SELECT FROM t", 0).startswith("SELECT s.row_bytes")
 
 
 # --- Currency API ------------------------------------------------------------
