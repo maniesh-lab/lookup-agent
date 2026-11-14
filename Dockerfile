@@ -7,6 +7,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# The base image's own pip and setuptools have known security advisories.
+RUN pip install --upgrade pip setuptools
+
 # CPU-only PyTorch first, so sentence-transformers doesn't pull the much
 # larger CUDA build.
 RUN pip install torch --index-url https://download.pytorch.org/whl/cpu

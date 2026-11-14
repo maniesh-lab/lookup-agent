@@ -39,11 +39,11 @@ The agent loops between the LLM and the tools until it has an answer, with a ste
 
 **Search** (26 queries, `python -m eval.run_retrieval_eval`, no LLM involved):
 
-| Layer | Hit rate @5 | MRR |
-|---|---|---|
-| Vector | 100% (26/26) | 1.00 |
-| Hybrid (vector + keyword, RRF) | 100% (26/26) | 0.97 |
-| Hybrid + reranker | 100% (26/26) | 0.96 |
+| Layer | Hit rate @1 | Hit rate @5 | MRR |
+|---|---|---|---|
+| Vector | 100% (26/26) | 100% (26/26) | 1.00 |
+| Hybrid (vector + keyword, RRF) | 96% (25/26) | 100% (26/26) | 0.97 |
+| Hybrid + reranker | 92% (24/26) | 100% (26/26) | 0.96 |
 
 **Agent** (`python -m eval.run_eval`, scored by rules, see `eval/scoring.py`), measured with `openai/gpt-oss-20b`, a small model on Groq's free tier, 41 questions per run, one run per prompt version (v1 on 2026-10-24, v2 with its current rules on 2026-10-25). The default prompt is now **v3** (v2 plus one rule, see below); it has only had a partial run so far.
 
@@ -62,7 +62,7 @@ How to read this:
 - **v2's one miss (q28):** asked how fast premium members get a support reply, it said reply times aren't stored instead of checking the support policy (12 hours). The same question passed in v2's previous run, so it may be run-to-run variation, but the likely trigger was v2's "when the data doesn't exist" rule being applied to a docs question. Prompt v3 adds one rule for that (see below).
 - **The real differences only show up when reading the answers.** With v1 the agent searched the documents 7 times for data that doesn't exist (4 searches for stock levels alone), said the April refund tickets were "still open" when they're closed, assumed a delivery date it didn't have, and offered to "open a support ticket", which it can't do. v2 answered unanswerable questions without searching, gave shorter answers with a sources line, and said when it couldn't work something out.
 - **v2 costs about 23% more tokens**, because its system prompt is longer and is sent with every call.
-- **Search is saturated too.** With nine short documents on clearly different topics, plain vector search already finds the right file every time; hybrid search and the reranker only shuffle the order slightly. They would matter on a bigger or messier document set.
+- **Search is saturated too.** With nine short documents on clearly different topics, plain vector search already finds the right file every time and puts it first every time; hybrid search and the reranker move it to second place on one and two queries (hit rate @1, added on 2026-11-14). They would matter on a bigger or messier document set.
 - **Small sample**: one run per prompt, one model.
 
 **Harder questions** (`python -m eval.run_eval --set hard`, 15 questions, measured with `openai/gpt-oss-120b`, the larger model on Groq's free tier; v1 on 2026-10-24, v2 with its current rules on 2026-10-25):
@@ -93,7 +93,7 @@ How to read this:
 | Hard set FOLLOWUP: h06, h07 (120b) | 2/2 | 2/2 |
 
 - **Not a full run**: 17 of the 56 questions (q23 is in two rows and was run twice, passing both times). The v2 column is from v2's saved runs of the same cases.
-- **Two v3 passes are after re-scoring.** The first scoring marked q22 ("does not contain cost, profit, or margin information, so I can't calculate or provide…") and h02 ("did not have any order recorded") as wrong, though both are correct refusals. The phrase lists got "does not contain", "can't calculate" and "not have any order", and both runs were re-scored without new AI calls. The new phrases change no saved v1 or v2 result.
+- **Two v3 passes are after re-scoring.** The first scoring marked q22 ("does not contain cost, profit, or margin information, so I can't calculate or provide…") and h02 ("did not have any order recorded") as wrong, though both are correct refusals. The scorer's refusal phrases got "does not contain" and "can't calculate", h02's expected phrases got "not have any order", and both runs were re-scored without new AI calls. The new phrases change no saved v1 or v2 result.
 - **The new rule caused no extra document searches** on the NONE and TRAP cases (one search on q41, the same as v2). v3 made three more database calls than v2 on the hard set TRAP cases (7 against 4: three queries on h02 instead of one, one on h15 instead of none).
 - The FOLLOWUP cases also ran with the conversation trimming (earlier tool results replaced by a placeholder) and still passed.
 
@@ -111,6 +111,8 @@ cd lookup-agent
 cp .env.example .env          # then put your key after GROQ_API_KEY=
 docker compose up --build
 ```
+
+The app is published on 127.0.0.1 only, because `/chat` spends your LLM key and is open while `CHAT_API_KEY` is empty. To serve other machines, set `CHAT_API_KEY` and `INGEST_TOKEN` in `.env` first, then change the app's port line in `docker-compose.yaml` to `"8000:8000"`.
 
 The first start builds the database (tables, fake shop data, policy search index) and downloads the search models, so it takes a few minutes. Later starts load the models from the `models` volume at startup, in a few seconds. Then:
 
@@ -133,7 +135,7 @@ pip install torch --index-url https://download.pytorch.org/whl/cpu   # CPU-only 
 pip install -r requirements.txt
 cp .env.example .env                     # add GROQ_API_KEY
 docker compose up -d postgres            # just the database
-python -m scripts.setup_db               # schema + seed data + policy ingestion
+python -m scripts.setup_db               # schema + seed data + policy ingestion (--reset to rebuild later)
 uvicorn app.main:app --reload            # chat page and API on http://127.0.0.1:8000
 ```
 
@@ -155,11 +157,19 @@ python -m scripts.try_tools fx 250 EUR INR
 | `POST` | `/chat` | Ask a question. Body: `message`, optional `thread_id`. Needs `X-API-Key` if `CHAT_API_KEY` is set (401 if missing or wrong). 429 with a `Retry-After` header after `CHAT_RATE_LIMIT_PER_MINUTE` questions from one IP in 60 seconds |
 | `POST` | `/ingest` | Re-index the policy documents (unchanged files are skipped). Needs `X-Ingest-Token` if `INGEST_TOKEN` is set |
 
-Every response carries an `X-Request-ID` header. The same id is on every log line for that request.
+Other answers from `/chat`: 409 when the conversation already has `MAX_THREAD_TURNS` questions (start a new one), 413 for a body over 64 KB, 422 for an empty or over-2,000-character message or a malformed `thread_id` (up to 128 letters, digits, `.`, `_`, `:` or `-`), 499 when the caller hangs up (the run is cancelled), and 503 when every LLM provider is down. `/ingest` answers 401 for a missing or wrong token.
+
+Every response carries an `X-Request-ID` header (the caller's own when it is up to 128 letters, digits, `.`, `_`, `:` or `-`; otherwise a new one), and the same id is on every log line for that request. Every response also has `X-Content-Type-Options`, `X-Frame-Options` and `Referrer-Policy` headers.
 
 ## Safety of the SQL tool
 
-The model writes its own SQL, so it runs inside four layers: only single `SELECT` statements pass the check; it connects as a database user that can only read the five shop tables; every transaction is read-only with a 5-second timeout; and at most 100 rows come back.
+The model writes its own SQL, so it runs inside five layers: only a single `SELECT` passes the check (comments and strings are read the way Postgres reads them, so nothing can hide a second statement); the query runs wrapped in a subquery, where a second statement can't run anyway; it connects as a database user that can only read the five shop tables; every transaction is read-only with a 5-second timeout; and at most 100 rows come back, with Postgres itself leaving out any row over 128 KB, so one huge value can't fill the server's memory.
+
+The final review (2026-11-14) tried about 20 attacks on these layers: turning the timeout off from inside a query, writing through `query_to_xml`, reading server files or the conversation tables, stopping other sessions' queries, and hiding a `DROP TABLE` behind comments, dollar quotes or quoted names. A few got past the keyword check (now fixed); none got past the layers behind it. The integration tests repeat them.
+
+## Safety of the chat page
+
+Answers can repeat text from the database, so the page treats them as untrusted. Markdown is sanitized with DOMPurify, with images, forms and inline styles removed (an image pointing at another site could carry data out when it loads). The two libraries come from jsDelivr pinned to exact versions with integrity hashes, so the browser refuses them if the CDN ever serves anything else. The page is served with a Content-Security-Policy that allows only its own script (by hash), those two files, Google Fonts and requests back to this server.
 
 ## Evals
 
@@ -186,7 +196,7 @@ With a free [Langfuse](https://langfuse.com) account, set `LANGFUSE_PUBLIC_KEY`,
 
 ![A Langfuse trace of one question: an LLM call, a search_docs call, then the LLM call that writes the answer](docs/images/langfuse-trace.png)
 
-In this trace the document search took 7.8 s of the 9.1 s total, while both LLM calls took under a second, so search was the step to speed up first.
+In this trace (recorded with prompt v2 on 2026-10-24, before the search speed-up below) the document search took 7.8 s of the 9.1 s total, while both LLM calls took under a second, so search was the step to speed up first.
 
 **Search timings, before and after** (2026-11-08, measured stage by stage on CPU, `SEARCH_MODE=rerank`; 3 cold runs and 10 warm searches each):
 
@@ -215,7 +225,7 @@ ruff check .
 ruff format --check .
 ```
 
-The integration tests rebuild the tables in the database you point them at, so use a separate one. Create it once with `docker compose exec postgres createdb -U postgres lookup_test`. CI runs lint and both test groups against a real pgvector Postgres on every push to `main` and every pull request.
+The integration tests rebuild the tables in the database you point them at, so use a separate one whose name ends in `_test` (they refuse any other name, so an exported `TEST_DATABASE_URL` can't wipe `lookup_db`). Create it once with `docker compose exec postgres createdb -U postgres lookup_test`. CI runs lint and both test groups against a real pgvector Postgres on every push to `main` and every pull request.
 
 ## Project structure
 
@@ -229,10 +239,10 @@ app/
   retrieval/           chunking, ingestion, vector / hybrid / rerank search
   services/llm.py      LLM client on Steadfast
   core/                settings, JSON logging, Langfuse tracing, the /chat rate limit
-db/                    schema.sql, seed.py (repeatable fake shop data)
+db/                    schema.sql, roles.sql (the read-only user), seed.py (repeatable fake shop data)
 data/policies/         the nine policy documents
 eval/                  test set, scorer, eval runners, re-scorer, results
-scripts/               setup_db, ingest_docs, ask, try_tools
+scripts/               setup_db, ingest_docs, prune_threads, ask, try_tools
 tests/                 unit tests and integration tests
 docs/architecture.md   design and diagram
 CHANGELOG.md           what was built and changed
@@ -240,7 +250,7 @@ CHANGELOG.md           what was built and changed
 
 ## Settings
 
-All settings come from `.env` (see `.env.example`). The main ones: `LLM_PROVIDER` (`groq` or `openai`, the other one becomes the fallback when its key is set), `LLM_MODEL` (the Groq model; with `LLM_PROVIDER=openai` the model is `OPENAI_MODEL`), `PROMPT_VERSION` (default `v3`), `MAX_AGENT_STEPS`, `SEARCH_MODE` (`vector`, `hybrid` or `rerank`), and the optional Langfuse keys for tracing.
+All settings come from `.env` (see `.env.example`). The main ones: `LLM_PROVIDER` (`groq` or `openai`, the other one becomes the fallback when its key is set), `LLM_MODEL` (the Groq model; with `LLM_PROVIDER=openai` the model is `OPENAI_MODEL`), `PROMPT_VERSION` (default `v3`), `MAX_AGENT_STEPS`, `MAX_THREAD_TURNS` (questions per conversation, default 50), `SEARCH_MODE` (`vector`, `hybrid` or `rerank`), and the optional Langfuse keys for tracing.
 
 Two settings protect `POST /chat`:
 
@@ -259,6 +269,9 @@ Less common settings (SQL timeout and row limit, search models, the LLM calls-pe
 - The eval's "must not mention" checks are plain text matches, so a correct refusal like "no orders were deleted" can fail on "were deleted".
 - The `/chat` rate limit is kept in memory: the counts reset when the server restarts, and it only works for a single server process (with several workers or containers, each counts on its own). Clients are told apart by IP, so behind a reverse proxy every request looks like the proxy's IP, and all users share one limit, unless uvicorn is told to trust the proxy's forwarded headers (`--forwarded-allow-ips=<proxy address>`). With Docker port publishing, requests can also arrive from the Docker gateway's IP. For several processes, a shared store like Redis would be needed.
 - The API key is one shared key, not per-user accounts.
+- Whoever has a `thread_id` can continue that conversation and ask what was said in it. Ids made by the server are random UUIDs, and logs and traces only show a hash of them. Old conversations stay in Postgres until `python -m scripts.prune_threads --older-than-days N` removes them (run it from cron for a real deploy).
+- In the Docker setup the app's own database user (`DATABASE_URL`) is the Postgres superuser. Its queries are fixed and parameterized, but a real deploy should give it a separate non-superuser role.
+- The chat page loads marked and DOMPurify from jsDelivr (pinned by hash) and its fonts from Google Fonts, so a visitor's browser contacts those two services.
 
 ## License
 

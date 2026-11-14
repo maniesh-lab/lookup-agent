@@ -30,7 +30,10 @@
           "unable to find"
         ]
       ],
-      "max_tool_calls": 3
+      "max_tool_calls": 3,
+      "must_not_match": [
+        "\\$\\s?\\d"
+      ]
     },
     {
       "id": "h02",
@@ -55,7 +58,10 @@
           "not have any order"
         ]
       ],
-      "max_tool_calls": 3
+      "max_tool_calls": 3,
+      "must_not_match": [
+        "(?:march 3(?!\\d)|2026-03-03)[^.\\n]{0,80}\\$\\s?\\d"
+      ]
     },
     {
       "id": "h03",
@@ -217,7 +223,10 @@
           "don't track"
         ]
       ],
-      "max_tool_calls": 3
+      "max_tool_calls": 3,
+      "must_not_match": [
+        "profit[^.\\n]{0,60}\\$\\s?\\d"
+      ]
     },
     {
       "id": "h09",
@@ -264,7 +273,8 @@
       "truth": [
         {
           "check": "names",
-          "sql": "WITH q AS (SELECT p.name, sum(oi.quantity) AS units FROM order_items oi JOIN orders o ON o.id = oi.order_id JOIN products p ON p.id = oi.product_id WHERE o.status <> 'cancelled' AND o.order_date BETWEEN '2026-04-01' AND '2026-06-30' GROUP BY p.name) SELECT name FROM q WHERE units = (SELECT max(units) FROM q)"
+          "sql": "WITH q AS (SELECT p.name, sum(oi.quantity) AS units FROM order_items oi JOIN orders o ON o.id = oi.order_id JOIN products p ON p.id = oi.product_id WHERE o.status <> 'cancelled' AND o.order_date BETWEEN '2026-04-01' AND '2026-06-30' GROUP BY p.name) SELECT name FROM q WHERE units = (SELECT max(units) FROM q)",
+          "universe_sql": "SELECT name FROM products"
         }
       ],
       "must_mention": [
@@ -303,14 +313,20 @@
           "yes",
           "would have qualified",
           "would qualify",
-          "qualified",
           "qualifies"
         ],
         [
           "75"
         ]
       ],
-      "max_tool_calls": 4
+      "max_tool_calls": 4,
+      "must_not_mention": [
+        "would not have qualified",
+        "wouldn't have qualified",
+        "did not qualify",
+        "didn't qualify",
+        "not eligible"
+      ]
     },
     {
       "id": "h12",
@@ -327,18 +343,26 @@
         [
           "yes",
           "still covered",
+          "would still cover",
           "would cover",
-          "covered"
+          "would be covered",
+          "is covered"
         ],
         [
           "2 years",
           "two years",
           "24 months",
-          "2-year",
-          "12 months"
+          "2-year"
         ]
       ],
-      "max_tool_calls": 4
+      "max_tool_calls": 4,
+      "must_not_mention": [
+        "would not be covered",
+        "wouldn't be covered",
+        "would not cover",
+        "wouldn't cover",
+        "no longer covered"
+      ]
     },
     {
       "id": "h13",

@@ -29,7 +29,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from app.agent import create_agent
 from app.core.config import settings
 from app.core.logging import configure_logging
-from app.db import connect
+from app.db import connect_readonly
 from app.tools.external_api import convert
 from eval.scoring import score_case
 
@@ -55,7 +55,11 @@ class Truth:
     def __init__(self, rate_date: str | None = None):
         """rate_date: use that day's exchange rates (for re-scoring an old run);
         None means the latest rates, like the agent itself uses."""
-        self.conn = connect()
+        # The truth SQL only reads the shop tables, so it runs as the read-only user.
+        # Autocommit: the run doesn't sit inside one transaction for its whole length
+        # (holding locks that block setup_db), and one failing query doesn't break the rest.
+        self.conn = connect_readonly()
+        self.conn.autocommit = True
         self.requested_date = rate_date
         self.rate_date: str | None = None  # the date of the rates actually used
         self.rates: dict[tuple[str, str], float] = {}
@@ -69,18 +73,20 @@ class Truth:
             self.rate_date = self.rate_date or result.get("rate_date")
         return self.rates[(src, dst)]
 
+    def first_column(self, sql: str) -> list:
+        with self.conn.cursor() as cur:
+            cur.execute(sql)
+            return [_plain(r[0]) for r in cur.fetchall()]
+
     def for_case(self, case: dict) -> tuple[list[dict], float | None]:
         values = []
         for truth in case.get("truth", []):
-            with self.conn.cursor() as cur:
-                cur.execute(truth["sql"])
-                rows = cur.fetchall()
-            first_column = [r[0] for r in rows]
-            entry = {
-                "check": truth["check"],
-                "values": [_plain(v) for v in first_column],
-                "expected_number": None,
-            }
+            first_column = self.first_column(truth["sql"])
+            entry = {"check": truth["check"], "values": first_column, "expected_number": None}
+            if truth.get("unit"):
+                entry["unit"] = truth["unit"]
+            if truth.get("universe_sql"):  # every name of this kind, to catch extra ones
+                entry["universe"] = self.first_column(truth["universe_sql"])
             if truth["check"] == "number" and first_column and first_column[0] is not None:
                 number = float(first_column[0])
                 if truth.get("convert_to"):
@@ -104,44 +110,67 @@ async def run(prompt: str, ids: list[str] | None, delay: float, eval_set: str = 
 
     records = []
     start_tokens = _total_tokens(agent)
-    for i, case in enumerate(cases, start=1):
-        started = time.perf_counter()
-        try:
-            thread_id = None
-            for turn in case.get("turns", []):  # earlier messages in the same conversation
-                thread_id = (await agent.ask(turn, thread_id=thread_id)).thread_id
-            result = await agent.ask(case["question"], thread_id=thread_id)
-            answer, tools, sources = result.answer, result.tools_used, result.sources
-            error = None
-        except Exception as exc:  # one failing case shouldn't stop the run
-            answer, tools, sources, error = "", [], [], f"{type(exc).__name__}: {exc}"
-        seconds = round(time.perf_counter() - started, 2)
+    try:
+        for i, case in enumerate(cases, start=1):
+            records.append(await run_case(agent, truth, case))
+            score = records[-1]
+            mark = "PASS" if score["passed"] else "FAIL"
+            print(
+                f"[{i:>2}/{len(cases)}] {mark} {case['id']} {case['category']:<9} {score['seconds']:>5}s "
+                f"tools={score['tools_used']} {'; '.join(score['failures'])}"
+            )
+            if delay and i < len(cases):
+                await asyncio.sleep(delay)
+    finally:
+        # Saved even when the run stops early (Ctrl+C, a crash): the answers so far cost tokens.
+        if records:
+            tokens = _total_tokens(agent) - start_tokens
+            write_report(
+                prompt, records, tokens, rate_date=truth.rate_date, eval_set=eval_set, planned=len(cases)
+            )
 
+
+async def run_case(agent, truth: "Truth", case: dict) -> dict:
+    """Ask one case and score it. Any error fails the case instead of stopping the run."""
+    started = time.perf_counter()
+    errors = []
+    try:
+        thread_id = None
+        for turn in case.get("turns", []):  # earlier messages in the same conversation
+            thread_id = (await agent.ask(turn, thread_id=thread_id)).thread_id
+        result = await agent.ask(case["question"], thread_id=thread_id)
+        answer, tools, sources = result.answer, result.tools_used, result.sources
+    except Exception as exc:
+        answer, tools, sources = "", [], []
+        errors.append(f"{type(exc).__name__}: {exc}")
+    seconds = round(time.perf_counter() - started, 2)
+
+    try:
         truth_values, fx_expected = truth.for_case(case)
-        score = score_case(case, answer, tools, sources, truth_values, fx_expected)
-        if error:
-            score.failures.insert(0, error)
-        mark = "PASS" if score.passed else "FAIL"
-        print(
-            f"[{i:>2}/{len(cases)}] {mark} {case['id']} {case['category']:<9} {seconds:>5}s "
-            f"tools={tools} {'; '.join(score.failures)}"
-        )
-        records.append(
-            {
-                **asdict(score),
-                "question": case["question"],
-                "answer": answer,
-                "tools_used": tools,
-                "sources": sources,
-                "expected": {"truth": truth_values, "fx": fx_expected},
-                "seconds": seconds,
-            }
-        )
-        if delay and i < len(cases):
-            await asyncio.sleep(delay)
+    except Exception as exc:  # the currency API or a truth query failed
+        truth_values, fx_expected = [], None
+        errors.append(f"expected values unavailable: {type(exc).__name__}: {exc}")
 
-    tokens = _total_tokens(agent) - start_tokens
-    write_report(prompt, records, tokens, rate_date=truth.rate_date, eval_set=eval_set)
+    score = score_case(case, answer, tools, sources, truth_values, fx_expected)
+    if errors:
+        # Without this, a case with only "must not" checks would pass on an empty answer.
+        score.failures[:0] = errors
+        score.passed = score.answer_ok = False
+    return {
+        **asdict(score),
+        "question": case["question"],
+        "answer": answer,
+        "tools_used": tools,
+        "sources": sources,
+        "expected": saved_expected(truth_values, fx_expected),
+        "seconds": seconds,
+    }
+
+
+def saved_expected(truth_values: list[dict], fx_expected: float | None) -> dict:
+    """The expected values as saved with a result (name universes are left out: they're long)."""
+    truth = [{k: v for k, v in t.items() if k != "universe"} for t in truth_values]
+    return {"truth": truth, "fx": fx_expected}
 
 
 def _plain(value):
@@ -201,7 +230,12 @@ def append_summary_row(
 
 
 def write_report(
-    prompt: str, records: list[dict], tokens: int, rate_date: str | None = None, eval_set: str = "main"
+    prompt: str,
+    records: list[dict],
+    tokens: int,
+    rate_date: str | None = None,
+    eval_set: str = "main",
+    planned: int | None = None,
 ) -> None:
     model = settings.llm_model if settings.llm_provider == "groq" else settings.openai_model
     summary = print_summary(prompt, records, tokens, eval_set)
@@ -219,8 +253,12 @@ def write_report(
         "rate_date": rate_date,
         "records": records,
     }
+    label = stamp
+    if planned is not None and len(records) < planned:
+        report["partial"] = f"{len(records)} of {planned} cases (the run stopped early)"
+        label = f"{stamp} (partial, {len(records)}/{planned})"
     out.write_text(json.dumps(report, indent=2))
-    append_summary_row(stamp, prompt, f"{settings.llm_provider} / {model}", summary, eval_set)
+    append_summary_row(label, prompt, f"{settings.llm_provider} / {model}", summary, eval_set)
     print(f"Saved {out.name} and updated {SETS[eval_set][2]} in {RESULTS}")
 
 

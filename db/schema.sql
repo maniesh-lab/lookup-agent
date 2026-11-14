@@ -2,9 +2,10 @@
 --
 -- Safe to run again: it drops and recreates every table, so running it
 -- wipes the data. Load it with:
---     python -m scripts.setup_db
--- or by hand:
+--     python -m scripts.setup_db --reset
+-- or by hand (then db/roles.sql for the read-only user):
 --     docker compose exec -T postgres psql -U postgres -d lookup_db < db/schema.sql
+--     docker compose exec -T postgres psql -U postgres -d lookup_db < db/roles.sql
 
 CREATE EXTENSION IF NOT EXISTS vector;
 
@@ -82,7 +83,7 @@ CREATE TABLE chunks (
     chunk_index  INTEGER NOT NULL,
     heading      TEXT    NOT NULL,
     content      TEXT    NOT NULL,
-    embedding    vector(384) NOT NULL,           -- bge-small's size; change it with EMBEDDING_MODEL
+    embedding    vector(384) NOT NULL,           -- bge-small's size: a model of another size needs this edited too
     tsv          tsvector GENERATED ALWAYS AS (
                      to_tsvector('english', heading || ' ' || content)
                  ) STORED,
@@ -92,24 +93,5 @@ CREATE TABLE chunks (
 CREATE INDEX chunks_embedding_idx ON chunks USING hnsw (embedding vector_cosine_ops);
 CREATE INDEX chunks_tsv_idx       ON chunks USING gin (tsv);
 
--- ---------------------------------------------------------------------------
--- Read-only user for the agent's SQL tool.
--- It can SELECT from the shop tables and nothing else. Every transaction
--- is read-only and every query is stopped after 5 seconds.
--- The password is a local demo default; change it for a real deploy.
--- ---------------------------------------------------------------------------
-
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'lookup_reader') THEN
-        CREATE ROLE lookup_reader LOGIN PASSWORD 'lookup_reader';
-    END IF;
-    EXECUTE format('GRANT CONNECT ON DATABASE %I TO lookup_reader', current_database());
-END
-$$;
-
-REVOKE ALL ON ALL TABLES IN SCHEMA public FROM lookup_reader;
-GRANT USAGE ON SCHEMA public TO lookup_reader;
-GRANT SELECT ON customers, products, orders, order_items, support_tickets TO lookup_reader;
-ALTER ROLE lookup_reader SET default_transaction_read_only = on;
-ALTER ROLE lookup_reader SET statement_timeout = '5s';
+-- The read-only user for the agent's SQL tool is set up in db/roles.sql
+-- (scripts.setup_db runs it after this file, and again on every start).

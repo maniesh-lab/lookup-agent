@@ -5,7 +5,8 @@ the embedder and the reranker are replaced with small fakes.
 
 Integration tests (marked `integration`) need a Postgres with pgvector.
 They run when TEST_DATABASE_URL is set (CI sets it) and are skipped
-otherwise. Warning: they rebuild the tables in that database.
+otherwise. Warning: they rebuild the tables in that database, so its name
+must end in _test (any other name stops the run).
 """
 
 import hashlib
@@ -114,6 +115,15 @@ def test_db_url():
     url = os.environ.get("TEST_DATABASE_URL")
     if not url:
         pytest.skip("TEST_DATABASE_URL not set")
+    from psycopg.conninfo import conninfo_to_dict
+
+    from app.db import plain_url
+
+    name = conninfo_to_dict(plain_url(url)).get("dbname", "")
+    if not name.endswith("_test"):
+        # These tests drop and rebuild the shop tables. An exported TEST_DATABASE_URL
+        # pointing at lookup_db would wipe it on every test run (and every push).
+        pytest.exit(f"TEST_DATABASE_URL points at {name!r}; its name must end in _test.", returncode=4)
     return url
 
 
@@ -125,9 +135,11 @@ def seeded_db(test_db_url):
     from app.db import connect
     from db import seed
 
-    schema = Path(__file__).resolve().parent.parent / "db" / "schema.sql"
+    db_dir = Path(__file__).resolve().parent.parent / "db"
     with connect(test_db_url) as conn:
-        conn.execute(schema.read_text(encoding="utf-8"))
+        conn.execute((db_dir / "schema.sql").read_text(encoding="utf-8"))
         conn.commit()
         fingerprint = seed.write(seed.build(), conn)
+        conn.execute((db_dir / "roles.sql").read_text(encoding="utf-8"))
+        conn.commit()
     return {"url": test_db_url, "fingerprint": fingerprint}

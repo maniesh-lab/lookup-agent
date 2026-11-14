@@ -7,6 +7,7 @@ rebuilt, for example:
 
 import json
 import re
+from pathlib import Path
 
 import psycopg
 import pytest
@@ -155,6 +156,73 @@ def test_long_values_are_cut(readonly):
     result = qd.run_query("SELECT repeat('x', 100000) AS big", conn=readonly)
     cell = result["rows"][0][0]
     assert len(cell) < 2100 and "100000 characters in total" in cell
+
+
+def test_oversized_rows_never_reach_the_app(readonly):
+    result = qd.run_query("SELECT repeat('x', 200000) AS big, 1 AS small", conn=readonly)
+    assert result["columns"] == ["big", "small"]
+    assert result["rows"] == [] and result["rows_left_out"] == 1
+
+
+def test_results_keep_their_types_order_and_repeated_columns(readonly):
+    result = qd.run_query(
+        "SELECT o.id, c.id, o.total, o.order_date FROM orders o JOIN customers c ON c.id = o.customer_id "
+        "ORDER BY o.total DESC, o.id LIMIT 3 -- biggest orders",
+        conn=readonly,
+    )
+    assert result["columns"] == ["id", "id", "total", "order_date"]
+    totals = [row[2] for row in result["rows"]]
+    assert totals == sorted(totals, reverse=True) and isinstance(totals[0], float)
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", result["rows"][0][3])
+
+
+HIDDEN_SECOND_STATEMENTS = [
+    "SELECT $$'$$; DROP TABLE orders; SELECT $$'$$",
+    "SELECT 1 /* ' */ ; DELETE FROM orders; /* ' */",
+    "SELECT 1 -- '\n; DELETE FROM orders --'",
+    "SELECT 1; DELETE FROM orders",
+]
+
+
+@pytest.mark.parametrize("sql", HIDDEN_SECOND_STATEMENTS)
+def test_a_second_statement_is_refused_even_without_the_check(sql, readonly, db, monkeypatch):
+    # The check refuses these; this makes sure the layers behind it would too.
+    monkeypatch.setattr(qd, "check_sql", lambda s: s.strip().rstrip(";").strip())
+    before = one(db, "SELECT count(*) FROM orders")
+    assert "error" in qd.run_query(sql, conn=readonly)
+    readonly.rollback()
+    assert one(db, "SELECT count(*) FROM orders") == before
+
+
+@pytest.mark.parametrize(
+    "sql, error",
+    [
+        (
+            "SELECT query_to_xml('UPDATE orders SET total = total WHERE false', true, false, '')",
+            "not allowed",
+        ),
+        ("SELECT set_config('transaction_read_only', 'off', true)", "read-write mode"),
+        ("SELECT pg_read_file('/etc/passwd')", "permission denied"),
+        ("SELECT pg_cancel_backend(pg_backend_pid())", "permission denied"),
+        ("SELECT pg_terminate_backend(pg_backend_pid())", "permission denied"),
+        ("SELECT nextval('documents_id_seq')", "permission denied"),
+    ],
+)
+def test_reader_tricks_are_blocked_by_the_database(sql, error, readonly):
+    result = qd.run_query(sql, conn=readonly)
+    readonly.rollback()
+    assert error in result["error"]
+
+
+def test_reader_role_is_read_only_and_limited_on_its_own(seeded_db):
+    """Without the connection options the app adds: the role's own settings and grants."""
+    with psycopg.connect(readonly_url(seeded_db["url"])) as conn:
+        assert one(conn, "SHOW default_transaction_read_only") == ("on",)
+        assert one(conn, "SHOW statement_timeout") == ("5s",)
+        conn.rollback()
+        conn.execute("SET TRANSACTION READ WRITE")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute("INSERT INTO products VALUES (999, 'x', 'y', 1)")
 
 
 def test_schema_guide_matches_the_database(db):
@@ -316,3 +384,55 @@ def test_hard_set_traps_really_have_no_data(db):
     )
     assert one(db, "SELECT count(*) FROM orders WHERE order_date >= '2026-08-01'")[0] == 0
     assert one(db, "SELECT count(*) FROM products WHERE category ILIKE %s", "%toy%")[0] == 0
+
+
+# --- Database housekeeping scripts -------------------------------------------------
+
+
+async def test_prune_threads_deletes_only_old_conversations(seeded_db):
+    from scripts.prune_threads import prune
+
+    url = seeded_db["url"]
+    registry = default_registry()
+    async with AsyncPostgresSaver.from_conn_string(plain_url(url)) as saver:
+        await saver.setup()
+        llm = FakeLLM([text_reply("a"), text_reply("b")])
+        graph = build_graph(llm, registry, prompt_version="v2", max_steps=2, checkpointer=saver)
+        agent = Agent(graph, registry, prompt_version="v2", max_steps=2)
+        await agent.ask("hi", thread_id="prune-old")
+        await agent.ask("hi", thread_id="prune-new")
+    with connect(url) as conn:
+        conn.execute(
+            "UPDATE checkpoints SET checkpoint = jsonb_set(checkpoint, '{ts}', to_jsonb('2020-01-01'::text))"
+            " WHERE thread_id = 'prune-old'"
+        )
+        conn.commit()
+
+    assert await prune(30, dry_run=True, url=url) == ["prune-old"]
+    assert await prune(30, url=url) == ["prune-old"]
+    with connect(url) as conn:
+        left = {row[0] for row in conn.execute("SELECT DISTINCT thread_id FROM checkpoints")}
+    assert "prune-old" not in left and "prune-new" in left
+
+
+def test_roles_file_can_run_again_without_touching_data(db, seeded_db):
+    roles = Path(__file__).resolve().parents[2] / "db" / "roles.sql"
+    before = one(db, "SELECT count(*) FROM orders")
+    db.execute(roles.read_text(encoding="utf-8"))
+    db.commit()
+    assert one(db, "SELECT count(*) FROM orders") == before
+
+
+def test_ingest_of_another_folder_keeps_the_rest_of_the_index(seeded_db, ingested, tmp_path):
+    (tmp_path / "extra.md").write_text("# Extra\n\n## Note\n\nAn extra policy.", encoding="utf-8")
+    with connect(seeded_db["url"], vector=True) as conn:
+        stats = ingest_folder(tmp_path, embedder=FakeEmbedder(), conn=conn, remove_missing=False)
+        assert stats.added == ["extra.md"] and stats.removed == []
+        assert one(conn, "SELECT count(*) FROM documents WHERE source = 'returns.md'") == (1,)
+        conn.execute("DELETE FROM documents WHERE source = 'extra.md'")
+        conn.commit()
+
+
+def test_seed_fingerprint_is_pinned(seeded_db):
+    """The same seed gives the same rows on any machine (any Python, any DateStyle)."""
+    assert seeded_db["fingerprint"] == "36810922ac59d47261d5fdbea6a4807c"

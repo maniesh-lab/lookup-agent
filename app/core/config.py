@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     # Agent
     prompt_version: str = "v3"
     max_agent_steps: int = 6
+    max_thread_turns: int = 50  # questions one conversation may hold (0: no limit)
 
     # Search
     embedding_model: str = "BAAI/bge-small-en-v1.5"

@@ -1,7 +1,10 @@
 """Run one chat turn through the graph and collect the answer and its sources."""
 
+import asyncio
+import hashlib
 import json
 import uuid
+from contextlib import asynccontextmanager
 from dataclasses import asdict, dataclass, field
 
 import structlog
@@ -12,6 +15,46 @@ from app.tools.registry import ToolRegistry
 log = structlog.get_logger(__name__)
 
 NO_ANSWER = "Sorry, I couldn't finish looking that up. Please try asking in a simpler way."
+
+
+class ThreadTooLong(Exception):
+    """The conversation already has the most questions one thread may hold."""
+
+
+def thread_ref(thread_id: str | None) -> str | None:
+    """A short stand-in for a thread_id in logs and traces.
+
+    Whoever knows a thread_id can continue that conversation and ask what was
+    said in it, so the id itself is kept out of logs and Langfuse.
+    """
+    return hashlib.sha256(thread_id.encode()).hexdigest()[:16] if thread_id else None
+
+
+class _ThreadLocks:
+    """One turn at a time per conversation, in this process.
+
+    Two questions sent at once on the same thread would both start from the
+    same saved history and one turn would be lost. The second one waits for
+    the first instead. Locks are dropped once nobody holds or waits for them.
+    """
+
+    def __init__(self):
+        self._locks: dict[str, list] = {}  # thread_id -> [lock, holders and waiters]
+
+    @asynccontextmanager
+    async def hold(self, thread_id: str):
+        entry = self._locks.setdefault(thread_id, [asyncio.Lock(), 0])
+        entry[1] += 1
+        try:
+            async with entry[0]:
+                yield
+        finally:
+            entry[1] -= 1
+            if not entry[1]:
+                del self._locks[thread_id]
+
+    def __len__(self) -> int:
+        return len(self._locks)
 
 
 @dataclass
@@ -100,12 +143,23 @@ def build_sources(records: list[ToolCallRecord], registry: ToolRegistry) -> list
 
 
 class Agent:
-    def __init__(self, graph, registry: ToolRegistry, *, prompt_version: str, max_steps: int, llm=None):
+    def __init__(
+        self,
+        graph,
+        registry: ToolRegistry,
+        *,
+        prompt_version: str,
+        max_steps: int,
+        llm=None,
+        max_turns: int = 0,
+    ):
         self.graph = graph
         self.llm = llm  # kept so callers (like the eval) can read token usage
         self.registry = registry
         self.prompt_version = prompt_version
         self.max_steps = max_steps
+        self.max_turns = max_turns  # questions per thread; 0 means no limit
+        self.thread_locks = _ThreadLocks()
 
     async def ask(
         self, question: str, thread_id: str | None = None, correlation_id: str | None = None
@@ -116,8 +170,31 @@ class Agent:
             # Each step is 2 graph nodes; leave room so our own cap triggers first.
             "recursion_limit": 2 * self.max_steps + 6,
         }
+        async with self.thread_locks.hold(thread_id):
+            await self._check_thread_length(config)
+            return await self._run_turn(question, thread_id, config, correlation_id)
+
+    async def _check_thread_length(self, config: dict) -> None:
+        """Refuse a question once its thread has max_turns of them.
+
+        Every earlier question and answer is sent again with each new one and
+        stays in Postgres, so without a cap one thread could grow without end.
+        """
+        if not self.max_turns or self.graph.checkpointer is None:
+            return
+        snapshot = await self.graph.aget_state(config)
+        asked = sum(1 for m in snapshot.values.get("messages", []) if m.get("role") == "user")
+        if asked >= self.max_turns:
+            raise ThreadTooLong(
+                f"This conversation has reached its limit of {self.max_turns} questions. "
+                "Start a new conversation to keep going."
+            )
+
+    async def _run_turn(
+        self, question: str, thread_id: str, config: dict, correlation_id: str | None
+    ) -> ChatResult:
         with tracing.trace_turn(
-            thread_id=thread_id,
+            session_id=thread_ref(thread_id),
             question=question,
             prompt_version=self.prompt_version,
             correlation_id=correlation_id,
@@ -139,5 +216,7 @@ class Agent:
                 tool_calls=records,
             )
             span.update(output={"answer": result.answer, "tools_used": result.tools_used})
-        log.info("chat_turn_done", thread_id=thread_id, steps=result.steps, tools_used=result.tools_used)
+        log.info(
+            "chat_turn_done", thread=thread_ref(thread_id), steps=result.steps, tools_used=result.tools_used
+        )
         return result

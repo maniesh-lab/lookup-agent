@@ -47,19 +47,19 @@
       "id": "q08", "category": "DB",
       "question": "How many orders were cancelled between January 1 and January 31, 2026?",
       "expected_tools": ["query_database"],
-      "truth": [{"check": "number", "sql": "SELECT count(*) FROM orders WHERE status = 'cancelled' AND order_date BETWEEN '2026-01-01' AND '2026-01-31'"}]
+      "truth": [{"check": "number", "unit": "order", "sql": "SELECT count(*) FROM orders WHERE status = 'cancelled' AND order_date BETWEEN '2026-01-01' AND '2026-01-31'"}]
     },
     {
       "id": "q09", "category": "DB",
       "question": "List the names and cities of premium customers who signed up between January 1 and February 15, 2026 and placed at least one non-cancelled order over $150 before June 30, 2026.",
       "expected_tools": ["query_database"],
-      "truth": [{"check": "names", "sql": "SELECT DISTINCT c.full_name FROM customers c JOIN orders o ON o.customer_id = c.id WHERE c.plan = 'premium' AND c.signup_date BETWEEN '2026-01-01' AND '2026-02-15' AND o.status <> 'cancelled' AND o.total > 150 AND o.order_date < '2026-06-30'"}]
+      "truth": [{"check": "names", "sql": "SELECT DISTINCT c.full_name FROM customers c JOIN orders o ON o.customer_id = c.id WHERE c.plan = 'premium' AND c.signup_date BETWEEN '2026-01-01' AND '2026-02-15' AND o.status <> 'cancelled' AND o.total > 150 AND o.order_date < '2026-06-30'", "universe_sql": "SELECT full_name FROM customers"}]
     },
     {
       "id": "q10", "category": "DB",
       "question": "Which 3 products had the highest total quantity sold in orders placed between April 1 and June 30, 2026, not counting cancelled orders?",
       "expected_tools": ["query_database"],
-      "truth": [{"check": "names", "sql": "SELECT p.name FROM order_items oi JOIN orders o ON o.id = oi.order_id JOIN products p ON p.id = oi.product_id WHERE o.status <> 'cancelled' AND o.order_date BETWEEN '2026-04-01' AND '2026-06-30' GROUP BY p.name ORDER BY sum(oi.quantity) DESC LIMIT 3"}]
+      "truth": [{"check": "names", "sql": "SELECT p.name FROM order_items oi JOIN orders o ON o.id = oi.order_id JOIN products p ON p.id = oi.product_id WHERE o.status <> 'cancelled' AND o.order_date BETWEEN '2026-04-01' AND '2026-06-30' GROUP BY p.name ORDER BY sum(oi.quantity) DESC LIMIT 3", "universe_sql": "SELECT name FROM products"}]
     },
     {
       "id": "q11", "category": "DB",
@@ -71,13 +71,13 @@
       "id": "q12", "category": "DB",
       "question": "how many customers have more than one open delivery ticket created between February 1 and May 31, 2026?",
       "expected_tools": ["query_database"],
-      "truth": [{"check": "number", "sql": "SELECT count(*) FROM (SELECT customer_id FROM support_tickets WHERE topic = 'delivery' AND status = 'open' AND created_at BETWEEN '2026-02-01' AND '2026-05-31' GROUP BY customer_id HAVING count(*) > 1) t"}]
+      "truth": [{"check": "number", "unit": "customer", "sql": "SELECT count(*) FROM (SELECT customer_id FROM support_tickets WHERE topic = 'delivery' AND status = 'open' AND created_at BETWEEN '2026-02-01' AND '2026-05-31' GROUP BY customer_id HAVING count(*) > 1) t"}]
     },
     {
       "id": "q13", "category": "DB",
       "question": "Which customers bought something from the electronics category in a non-cancelled order dated between May 1 and May 31, 2026 and later opened a \"quality\" ticket on or before June 30, 2026?",
       "expected_tools": ["query_database"],
-      "truth": [{"check": "names", "sql": "SELECT DISTINCT c.full_name FROM customers c JOIN orders o ON o.customer_id = c.id JOIN order_items oi ON oi.order_id = o.id JOIN products p ON p.id = oi.product_id JOIN support_tickets t ON t.customer_id = c.id WHERE p.category = 'electronics' AND o.status <> 'cancelled' AND o.order_date BETWEEN '2026-05-01' AND '2026-05-31' AND t.topic = 'quality' AND t.created_at > o.order_date AND t.created_at <= '2026-06-30'"}]
+      "truth": [{"check": "names", "sql": "SELECT DISTINCT c.full_name FROM customers c JOIN orders o ON o.customer_id = c.id JOIN order_items oi ON oi.order_id = o.id JOIN products p ON p.id = oi.product_id JOIN support_tickets t ON t.customer_id = c.id WHERE p.category = 'electronics' AND o.status <> 'cancelled' AND o.order_date BETWEEN '2026-05-01' AND '2026-05-31' AND t.topic = 'quality' AND t.created_at > o.order_date AND t.created_at <= '2026-06-30'", "universe_sql": "SELECT full_name FROM customers"}]
     },
     {
       "id": "q14", "category": "API",
@@ -101,7 +101,7 @@
       "id": "q17", "category": "MIXED",
       "question": "Which premium customers had a delivered order between January 10 and March 31, 2026 and then opened a refund ticket between April 1 and April 30, 2026, and what does the refund policy say about premium members?",
       "expected_tools": ["query_database", "search_docs"], "expected_sources": ["refunds.md"],
-      "truth": [{"check": "names", "sql": "SELECT DISTINCT c.full_name FROM customers c JOIN orders o ON o.customer_id = c.id JOIN support_tickets t ON t.customer_id = c.id WHERE c.plan = 'premium' AND o.status = 'delivered' AND o.order_date BETWEEN '2026-01-10' AND '2026-03-31' AND t.topic = 'refund' AND t.created_at BETWEEN '2026-04-01' AND '2026-04-30'"}],
+      "truth": [{"check": "names", "sql": "SELECT DISTINCT c.full_name FROM customers c JOIN orders o ON o.customer_id = c.id JOIN support_tickets t ON t.customer_id = c.id WHERE c.plan = 'premium' AND o.status = 'delivered' AND o.order_date BETWEEN '2026-01-10' AND '2026-03-31' AND t.topic = 'refund' AND t.created_at BETWEEN '2026-04-01' AND '2026-04-30'", "universe_sql": "SELECT full_name FROM customers"}],
       "must_mention": [["scan", "store credit", "105%", "faster"]]
     },
     {
@@ -114,7 +114,7 @@
       "id": "q19", "category": "MIXED",
       "question": "How many orders placed between March 1 and March 31, 2026 are still marked \"processing\", and according to the shipping policy, how long should they have taken to ship?",
       "expected_tools": ["query_database", "search_docs"], "expected_sources": ["shipping.md"],
-      "truth": [{"check": "number", "sql": "SELECT count(*) FROM orders WHERE status = 'processing' AND order_date BETWEEN '2026-03-01' AND '2026-03-31'"}],
+      "truth": [{"check": "number", "unit": "order", "sql": "SELECT count(*) FROM orders WHERE status = 'processing' AND order_date BETWEEN '2026-03-01' AND '2026-03-31'"}],
       "must_mention": [["2 business days", "two business days"]]
     },
     {
@@ -122,7 +122,7 @@
       "question": "Omar Haddad has a damaged-item ticket dated May 9, 2026. What did he order on May 2, 2026, what's that order's total in GBP at today's rate, and does the damaged-item policy cover it?",
       "expected_tools": ["query_database", "convert_currency", "search_docs"], "expected_sources": ["damaged-items.md"],
       "truth": [
-        {"check": "names", "sql": "SELECT p.name FROM orders o JOIN customers c ON c.id = o.customer_id JOIN order_items oi ON oi.order_id = o.id JOIN products p ON p.id = oi.product_id WHERE c.full_name = 'Omar Haddad' AND o.order_date = '2026-05-02'"},
+        {"check": "names", "sql": "SELECT p.name FROM orders o JOIN customers c ON c.id = o.customer_id JOIN order_items oi ON oi.order_id = o.id JOIN products p ON p.id = oi.product_id WHERE c.full_name = 'Omar Haddad' AND o.order_date = '2026-05-02'", "universe_sql": "SELECT name FROM products"},
         {"check": "number", "convert_to": "GBP", "sql": "SELECT o.total FROM orders o JOIN customers c ON c.id = o.customer_id WHERE c.full_name = 'Omar Haddad' AND o.order_date = '2026-05-02'"}
       ],
       "must_mention": [["14 days", "14-day"]]
@@ -131,13 +131,14 @@
       "id": "q21", "category": "MIXED",
       "question": "Which basic-plan customers have a combined total of more than $1,000 across their non-cancelled orders placed between January 1 and June 30, 2026, and would the premium plan's free shipping rule have applied to orders of that size?",
       "expected_tools": ["query_database", "search_docs"], "expected_sources": ["shipping.md"],
-      "truth": [{"check": "names", "sql": "SELECT c.full_name FROM customers c JOIN orders o ON o.customer_id = c.id WHERE c.plan = 'basic' AND o.status <> 'cancelled' AND o.order_date BETWEEN '2026-01-01' AND '2026-06-30' GROUP BY c.full_name HAVING sum(o.total) > 1000"}],
+      "truth": [{"check": "names", "sql": "SELECT c.full_name FROM customers c JOIN orders o ON o.customer_id = c.id WHERE c.plan = 'basic' AND o.status <> 'cancelled' AND o.order_date BETWEEN '2026-01-01' AND '2026-06-30' GROUP BY c.full_name HAVING sum(o.total) > 1000", "universe_sql": "SELECT full_name FROM customers"}],
       "must_mention": [["25"]]
     },
     {
       "id": "q22", "category": "NONE",
       "question": "What was the shop's profit margin for the first quarter of 2026?",
-      "expected_tools": [], "expect_refusal": true
+      "expected_tools": [], "expect_refusal": true,
+      "must_not_match": ["\\d\\s*%"]
     },
     {
       "id": "q23", "category": "NONE",
@@ -206,7 +207,7 @@
       "id": "q34", "category": "DB",
       "question": "What is the most expensive product in the electronics category?",
       "expected_tools": ["query_database"],
-      "truth": [{"check": "names", "sql": "SELECT name FROM products WHERE category = 'electronics' ORDER BY price DESC LIMIT 1"}]
+      "truth": [{"check": "names", "sql": "SELECT name FROM products WHERE category = 'electronics' ORDER BY price DESC LIMIT 1", "universe_sql": "SELECT name FROM products"}]
     },
     {
       "id": "q35", "category": "DB",
@@ -243,7 +244,7 @@
       "id": "q40", "category": "MIXED",
       "question": "How many open delivery tickets does Bikash Tamang have, and what does the shipping policy say to do about a delayed order?",
       "expected_tools": ["query_database", "search_docs"], "expected_sources": ["shipping.md"],
-      "truth": [{"check": "number", "sql": "SELECT count(*) FROM support_tickets t JOIN customers c ON c.id = t.customer_id WHERE c.full_name = 'Bikash Tamang' AND t.topic = 'delivery' AND t.status = 'open'"}],
+      "truth": [{"check": "number", "unit": "ticket", "sql": "SELECT count(*) FROM support_tickets t JOIN customers c ON c.id = t.customer_id WHERE c.full_name = 'Bikash Tamang' AND t.topic = 'delivery' AND t.status = 'open'"}],
       "must_mention": [["ticket"]]
     },
     {

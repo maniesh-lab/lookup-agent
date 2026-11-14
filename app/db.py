@@ -30,7 +30,7 @@ def connect(url: str | None = None, *, vector: bool = False, **kwargs) -> psycop
 def connect_readonly(url: str | None = None) -> psycopg.Connection:
     """Open a connection as the read-only user, with a timeout on every query.
 
-    The role is read-only in the database too (see db/schema.sql); the
+    The role is read-only in the database too (see db/roles.sql); the
     options below repeat the rules so they hold even if the role is
     misconfigured.
     """

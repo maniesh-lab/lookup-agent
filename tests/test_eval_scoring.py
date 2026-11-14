@@ -4,8 +4,11 @@ import json
 from pathlib import Path
 
 from eval.scoring import (
+    extra_names,
     extract_numbers,
     is_refusal,
+    mentions,
+    mentions_count,
     mentions_name,
     mentions_number,
     normalize,
@@ -132,3 +135,103 @@ def test_hard_set_is_well_formed():
         assert set(c["expected_tools"]) <= tools, c["id"]
         assert c.get("must_mention") or c.get("truth"), f"{c['id']} has no answer check"
         assert all(isinstance(t, str) for t in c.get("turns", [])), c["id"]
+
+
+# --- Wrong answers that used to pass (found in the final review, 2026-11-14) ---------------
+
+HARD_SET = TEST_SET.parent / "hard_set.json"
+
+
+def case(case_id: str) -> dict:
+    for path in (TEST_SET, HARD_SET):
+        for c in json.loads(path.read_text())["cases"]:
+            if c["id"] == case_id:
+                return c
+    raise KeyError(case_id)
+
+
+def truth(case_id: str, expected=None, values=None, universe=None) -> list[dict]:
+    spec = case(case_id)["truth"][0]
+    entry = {
+        "check": spec["check"],
+        "values": values or [],
+        "expected_number": expected,
+        "unit": spec.get("unit"),
+    }
+    if universe is not None:
+        entry["universe"] = universe
+    return [entry]
+
+
+def answer_ok(case_id, answer, truth_values=(), fx=None) -> bool:
+    c = case(case_id)
+    return score_case(c, answer, c["expected_tools"], [], list(truth_values), fx).answer_ok
+
+
+def test_month_dates_are_not_answer_numbers():
+    assert extract_numbers("between January 1 and Jan. 31st, 2026, and on 1 March 2026") == []
+    wrong = "Between January 1 and January 31, 2026, 4 orders were cancelled."
+    assert not answer_ok("q08", wrong, truth("q08", 1))
+    assert answer_ok(
+        "q08", "Between January 1 and January 31, 2026, **1 order was cancelled**.", truth("q08", 1)
+    )
+
+
+def test_a_count_has_to_be_the_count_of_its_unit():
+    assert mentions_count("3 orders are still marked processing", 3, "order")
+    assert mentions_count("There was **1 cancelled order**", 1, "order")
+    assert mentions_count("Bikash has two open delivery tickets", 2, "ticket")
+    assert mentions_count("Number of orders still processing (March 1 - March 31, 2026): 3", 3, "order")
+    # The policy's "3-5 business days" isn't the count, and a different count fails.
+    assert not mentions_count(
+        "7 orders are still processing. Standard shipping takes 3-5 business days.", 3, "order"
+    )
+    assert not answer_ok(
+        "q40", "Bikash has 5 open tickets. Open a ticket after 2 business days.", truth("q40", 2)
+    )
+
+
+def test_the_opposite_yes_or_no_answer_fails():
+    no_h12 = "No. The standard 1-year warranty (12 months) has ended, so it is no longer covered."
+    assert not answer_ok("h12", no_h12)
+    yes_h12 = "Yes, the warranty would still cover the earbuds: premium members get 2 years."
+    assert answer_ok("h12", yes_h12)
+    no_h11 = "Omar's $60 order would not have qualified; free shipping starts at $75."
+    assert not answer_ok("h11", no_h11, truth("h11", 60.0))
+
+
+def test_a_refusal_with_made_up_figures_fails():
+    assert not answer_ok("q22", "Profit margin was 23.4%. I don't have a per-product breakdown.")
+    assert answer_ok("q22", "I don't have cost data, so I can't calculate the Q1 2026 profit margin.")
+    assert not answer_ok(
+        "h01", "Hannah Montoya ordered a Cork Yoga Mat for $45. I couldn't find any other orders."
+    )
+    invented = "Priya Sharma's order on March 3, 2026 totalled $173.50. I couldn't find a second order."
+    assert not answer_ok("h02", invented)
+    assert answer_ok("h02", "There is no order for Priya Sharma on 2026-03-03 in the database.")
+
+
+def test_number_phrases_match_whole_numbers_and_words_match_from_their_start():
+    assert mentions("free over $75", "75") and mentions("over $75.00", "75")
+    assert not mentions("a $175 order", "75") and not mentions("75,000 points", "75")
+    assert not mentions("$75.50", "75") and not mentions("$18.99", "8.99")
+    assert not mentions("within 17 days", "7 days") and not mentions("my eyes", "yes")
+    assert mentions("3 open tickets", "ticket")  # a stem still matches its plural
+
+
+def test_number_formats():
+    assert extract_numbers("USD173.50 or Rs.23,456.78 or ₹1,23,456.78") == [173.5, 23456.78, 123456.78]
+    assert extract_numbers("sizes 12,15,18") == [12.0, 15.0, 18.0]
+
+
+def test_names_need_a_seeded_truth_and_no_extra_names():
+    names = ["Cork Yoga Mat", "Orbit USB-C Hub", "Swift Wireless Mouse"]
+    everyone = names + ["Yoga Mat", "Bamboo Cutting Board"]
+    listed = "Cork Yoga Mat, Orbit USB-C Hub and Swift Wireless Mouse."
+    assert answer_ok("q10", listed, truth("q10", values=names, universe=everyone))
+    # "Yoga Mat" inside "Cork Yoga Mat" isn't an extra name; a fourth product is.
+    assert extra_names(listed + " Next: Bamboo Cutting Board.", names, everyone) == ["Bamboo Cutting Board"]
+    assert not answer_ok(
+        "q10", listed + " Next: Bamboo Cutting Board.", truth("q10", values=names, universe=everyone)
+    )
+    assert not answer_ok("q09", "Nobody.", truth("q09", values=[]))  # an unseeded database

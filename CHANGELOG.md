@@ -87,5 +87,36 @@ First full version.
 - The eval scorer missed two correct refusal wordings ("does not contain ... can't calculate", "did not have any order"). Added to the phrase lists; no saved v1 or v2 result changes.
 - `docker compose up --build` checked end to end on 2026-11-08: DOCS, DB and MIXED questions, a 4-turn conversation, 401 and 429, and the chat page (asking, follow-ups, Stop, both notices). The demo GIF's three questions still give the same answers with v3.
 
+### Security and correctness review (2026-11-14)
+Found in a final end-to-end review: attacks run against a throwaway database and the HTTP API, a read of all the code, and both PRs.
+
+**Security**
+- **Wide SQL results**: one `SELECT repeat('x', 200000000)` cost the app about 430 MB of memory, because rows were cut only after they arrived. Postgres now leaves out any row over 128 KB before sending it, and the agent is told why.
+- **SQL check**: a quote character inside a comment, a dollar-quoted string or a quoted name could hide a second statement from the check (psycopg's one-command mode and the read-only role still stopped it). Comments, strings and quoted names are now blanked out the way Postgres reads them, and every query runs wrapped in a subquery. Integration tests run the hidden statements with the check switched off, to prove the layers behind it hold.
+- **Read-only user**: `lookup_reader` could cancel or end other sessions' queries. Revoked. Its rules moved to `db/roles.sql`, which `setup_db` applies on every start, so an existing database (like the Docker volume) gets the fix on its next start.
+- **Request size**: bodies were read in full before the API key and rate-limit checks (a 50 MB body without a key cost about 240 MB). Bodies over 64 KB now get 413 before they are read, and `thread_id` is limited to 128 safe characters.
+- **Docker**: the app was published on every network interface while `/chat` and `/ingest` were open by default. It is now on 127.0.0.1; the README says how to open it up safely.
+- **Chat page**: the CDN libraries are pinned with integrity hashes; images, forms and inline styles are stripped from answers; the page has a Content-Security-Policy (its own script by hash, no outside images); every response has `X-Content-Type-Options`, `X-Frame-Options` and `Referrer-Policy`.
+- **Thread ids** no longer appear in logs or Langfuse (a short hash instead): whoever has one can continue the conversation.
+- **CI**: the workflow's token is read-only, actions are pinned to exact commits, and Dependabot opens weekly update PRs for pip packages and actions.
+
+**Correctness**
+- Two questions on one thread at the same time could lose a turn; they now run one after the other. A thread holds at most `MAX_THREAD_TURNS` questions (default 50, then 409), and `scripts/prune_threads.py` deletes conversations unused for N days.
+- Two `/ingest` calls at once could fail on a new file; they now run one at a time.
+- A non-ASCII or over-long `X-Request-ID` came back garbled; it is now replaced with a fresh id.
+- `scripts.ingest_docs <folder>` removed every document not in that folder (the whole policy index); it now only adds and updates, unless `--replace` is given.
+- `scripts.setup_db` with no flag wiped a database that had data; it now refuses unless `--reset` is given (`--if-empty`, used by Docker, is unchanged).
+- The integration tests refuse a database whose name doesn't end in `_test` (an exported `TEST_DATABASE_URL=.../lookup_db` would have wiped it on every push).
+- The seed fingerprint no longer depends on the server's DateStyle, and a test pins it.
+
+**Evals**
+- The scorer passed some wrong answers: a count found in the question's own dates ("January 1" when the answer was 1), the opposite yes/no answer (h11, h12), a refusal with a made-up figure (q22, h01, h02, h08), and extra names in a list. Dates written with month names are now ignored, a count must belong to its unit ("3 orders"), a number phrase must be the whole number, a phrase must start at a word, names cases fail on extra names, and refusal cases forbid invented figures. All 187 saved answers score the same as before.
+- `run_eval`: a failing truth query or currency call no longer stops the run, an error always fails its case, and a run that stops early still saves its answers.
+- `rescore`: skips files that are already re-scored, keeps cases removed from the set, needs `--rate-date` only for runs with currency cases, and points out expected values that changed since the run.
+- Truth SQL runs as the read-only user in autocommit, instead of one long superuser transaction.
+- The retrieval eval also reports hit rate @1: vector 100%, hybrid 96%, rerank 92% (MRR unchanged).
+
+**Tests**: 193 (156 without a database), up from 117.
+
 ### Not done yet
 - Live deploy

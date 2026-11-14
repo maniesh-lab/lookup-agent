@@ -25,7 +25,10 @@ services:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@postgres:5432/lookup_db
       READONLY_DATABASE_URL: postgresql://lookup_reader:lookup_reader@postgres:5432/lookup_db
     ports:
-      - "8000:8000"
+      # Only reachable from this machine: /chat spends your LLM key and is open while
+      # CHAT_API_KEY is empty. Docker publishes ports past host firewalls like ufw, so
+      # to serve other machines set CHAT_API_KEY and INGEST_TOKEN first, then use "8000:8000".
+      - "127.0.0.1:8000:8000"
     restart: unless-stopped
     volumes:
       - models:/models   # downloaded embedding/reranker models survive rebuilds

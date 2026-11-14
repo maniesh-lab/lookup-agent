@@ -53,14 +53,19 @@ def test_build_llm_without_a_key_explains_what_to_do(monkeypatch):
         build_llm()
 
 
-def test_tracing_is_off_without_keys():
+def test_tracing_is_off_without_keys(monkeypatch):
+    # Not left to the environment: a developer with Langfuse keys exported would
+    # otherwise turn tracing on here and send test data to Langfuse.
+    monkeypatch.setattr(settings, "langfuse_public_key", None)
+    monkeypatch.setattr(settings, "langfuse_secret_key", None)
     tracing._client.cache_clear()
     assert tracing.enabled() is False
-    with tracing.trace_turn(thread_id="t", question="q", prompt_version="v2", correlation_id=None) as span:
+    with tracing.trace_turn(session_id="t", question="q", prompt_version="v2", correlation_id=None) as span:
         span.update(output="ignored")
     with tracing.observe_tool(name="search_docs", arguments={}) as obs:
         obs.update(output="ignored")
     tracing.flush()
+    tracing._client.cache_clear()
 
 
 async def test_create_agent_wires_the_pieces(monkeypatch):
