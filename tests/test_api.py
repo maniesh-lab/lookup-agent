@@ -1,11 +1,19 @@
 """The HTTP API, with the agent replaced by a fake (the server's startup,
 which needs Postgres and an API key, is not run)."""
 
+import asyncio
+import base64
+import hashlib
+import re
+import threading
+import time
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app import main
-from app.agent.runner import ChatResult
+from app.agent.runner import ChatResult, ThreadTooLong
 from app.retrieval.ingest import IngestStats
 
 
@@ -72,9 +80,12 @@ def test_request_id_from_the_caller_is_kept(client):
     assert response.headers["X-Request-ID"] == "abc-123"
 
 
-def test_long_request_id_is_cut(client):
-    response = client.get("/health", headers={"X-Request-ID": "x" * 5000})
-    assert response.headers["X-Request-ID"] == "x" * main.MAX_REQUEST_ID_CHARS
+@pytest.mark.parametrize("given", ["x" * 5000, "has spaces", "caf\u00e9".encode(), "a\tb"])
+def test_odd_request_ids_are_replaced_with_a_fresh_one(client, given):
+    """Too long, spaces or non-ASCII: the header sent back would be messy (non-ASCII came back as
+    garbled bytes that some clients can't read), so a new id is made instead."""
+    response = client.get("/health", headers={"X-Request-ID": given})
+    assert re.fullmatch(r"[0-9a-f-]{36}", response.headers["X-Request-ID"])
 
 
 def test_a_crash_still_returns_a_request_id(client):
@@ -318,3 +329,95 @@ def test_the_search_pool_is_closed_even_when_startup_fails(monkeypatch):
         with TestClient(main.app):
             pass
     assert ran[-1] == "close_search_pool"
+
+
+# --- Limits and protective headers --------------------------------------------------
+
+
+def test_a_too_large_body_is_refused_before_it_is_read(client, agent):
+    body = b'{"message": "' + b"x" * main.MAX_REQUEST_BYTES + b'"}'
+    response = client.post("/chat", content=body, headers={"Content-Type": "application/json"})
+    assert response.status_code == 413 and "too large" in response.json()["detail"]
+    assert response.headers["X-Request-ID"] and response.headers["X-Content-Type-Options"] == "nosniff"
+    assert agent.asked == [] and main.chat_rate_limiter.tracked_clients() == 0
+
+
+def test_a_too_large_body_without_a_length_is_refused_while_it_arrives(client, agent):
+    def chunks():  # no Content-Length: the body is sent in pieces
+        yield b'{"message": "'
+        for _ in range(8):
+            yield b"x" * 16_384
+        yield b'"}'
+
+    response = client.post("/chat", content=chunks(), headers={"Content-Type": "application/json"})
+    assert response.status_code == 413 and agent.asked == []
+
+
+def test_a_normal_long_question_still_fits(client, agent):
+    emoji_question = "\U0001f600" * 2000  # the longest allowed message, in the bulkiest JSON form
+    response = client.post("/chat", json={"message": emoji_question})
+    assert response.status_code == 200
+
+
+@pytest.mark.parametrize("thread_id", ["t" * 129, "has space", "../../etc", "a;b"])
+def test_odd_thread_ids_are_refused(client, agent, thread_id):
+    response = client.post("/chat", json={"message": "hi", "thread_id": thread_id})
+    assert response.status_code == 422 and agent.asked == []
+
+
+def test_a_full_conversation_gets_409(client):
+    class FullAgent:
+        async def ask(self, *args, **kwargs):
+            raise ThreadTooLong("This conversation has reached its limit of 50 questions.")
+
+    main.app.dependency_overrides[main.get_agent] = FullAgent
+    try:
+        response = client.post("/chat", json={"message": "one more", "thread_id": "t-1"})
+    finally:
+        main.app.dependency_overrides.clear()
+    assert response.status_code == 409 and "limit of 50" in response.json()["detail"]
+
+
+@pytest.mark.parametrize("path", ["/health", "/", "/no-such-page"])
+def test_every_response_has_the_protective_headers(client, path):
+    response = client.get(path)
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"
+    assert response.headers["Referrer-Policy"] == "no-referrer"
+
+
+def test_chat_page_policy_allows_only_its_own_script_and_no_outside_images(client):
+    csp = client.get("/").headers["Content-Security-Policy"]
+    page = Path(main.CHAT_PAGE).read_text(encoding="utf-8")
+    for script in re.findall(r"<script>(.*?)</script>", page, re.DOTALL):
+        digest = base64.b64encode(hashlib.sha256(script.encode()).digest()).decode()
+        assert f"'sha256-{digest}'" in csp
+    assert "unsafe-inline" not in csp and "img-src 'self' data:" in csp and "default-src 'none'" in csp
+    assert 'style="' not in page  # inline style attributes would need 'unsafe-inline'
+
+
+def test_chat_page_pins_its_libraries_and_strips_images_from_answers(client):
+    page = client.get("/").text
+    assert page.count('integrity="sha384-') == 2
+    assert '"img"' in page and "FORBID_TAGS" in page
+
+
+async def test_two_ingests_never_run_at_once(monkeypatch):
+    import app.retrieval.ingest as ingest_module
+
+    running, most = 0, 0
+    lock = threading.Lock()
+
+    def slow_ingest():
+        nonlocal running, most
+        with lock:
+            running += 1
+            most = max(most, running)
+        time.sleep(0.05)
+        with lock:
+            running -= 1
+        return IngestStats()
+
+    monkeypatch.setattr(ingest_module, "ingest_folder", slow_ingest)
+    await asyncio.gather(main.ingest(), main.ingest())
+    assert most == 1

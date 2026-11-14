@@ -1,5 +1,9 @@
 import asyncio
+import base64
 import contextlib
+import hashlib
+import json
+import re
 import secrets
 import time
 import uuid
@@ -13,6 +17,7 @@ from pydantic import BaseModel, Field
 from steadfast import SteadfastError
 
 from app.agent import Agent, create_agent
+from app.agent.runner import ThreadTooLong, thread_ref
 from app.core import tracing
 from app.core.config import settings
 from app.core.logging import configure_logging
@@ -87,7 +92,9 @@ app = FastAPI(
 )
 
 
-MAX_REQUEST_ID_CHARS = 128
+# A caller's own request id is kept only when it looks like an id; anything else
+# (too long, spaces, non-ASCII) gets a fresh one, so the header we send back is clean.
+REQUEST_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 
 
 class CorrelationIdMiddleware:
@@ -107,8 +114,8 @@ class CorrelationIdMiddleware:
             return
 
         headers = dict(scope.get("headers") or [])
-        given = headers.get(b"x-request-id", b"").decode("ascii", errors="replace")[:MAX_REQUEST_ID_CHARS]
-        correlation_id = given or str(uuid.uuid4())
+        given = headers.get(b"x-request-id", b"").decode("ascii", errors="replace")
+        correlation_id = given if REQUEST_ID.fullmatch(given) else str(uuid.uuid4())
         structlog.contextvars.clear_contextvars()
         structlog.contextvars.bind_contextvars(correlation_id=correlation_id)
         start = time.perf_counter()
@@ -149,7 +156,92 @@ class CorrelationIdMiddleware:
         )
 
 
+# A question is at most 2,000 characters; even written as JSON escapes (up to 12
+# bytes for one emoji) it fits easily. Bigger bodies are refused before they are read.
+MAX_REQUEST_BYTES = 64 * 1024
+TOO_LARGE = f"The request is too large (the limit is {MAX_REQUEST_BYTES // 1024} KB)."
+
+
+class BodySizeLimitMiddleware:
+    """Refuse request bodies over MAX_REQUEST_BYTES with 413, without reading them into memory.
+
+    FastAPI reads and parses a JSON body before any dependency runs, so the API
+    key check and the rate limit can't stop a huge body: a 50 MB request with no
+    key used to cost about 240 MB of memory before its 401. A declared
+    Content-Length over the limit is refused at once; a body sent without one
+    is counted as it arrives and refused once it passes the limit.
+    """
+
+    def __init__(self, app, max_bytes: int = MAX_REQUEST_BYTES):
+        self.app = app
+        self.max_bytes = max_bytes
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        declared = dict(scope.get("headers") or []).get(b"content-length", b"")
+        if declared.isdigit() and int(declared) > self.max_bytes:
+            body = json.dumps({"detail": TOO_LARGE}).encode()
+            await send(
+                {
+                    "type": "http.response.start",
+                    "status": 413,
+                    "headers": [
+                        (b"content-type", b"application/json"),
+                        (b"content-length", b"%d" % len(body)),
+                    ],
+                }
+            )
+            await send({"type": "http.response.body", "body": body})
+            return
+
+        received = 0
+
+        async def counted_receive():
+            nonlocal received
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > self.max_bytes:
+                    # FastAPI passes an HTTPException from body reading on unchanged.
+                    raise HTTPException(status_code=413, detail=TOO_LARGE)
+            return message
+
+        await self.app(scope, counted_receive, send)
+
+
+SECURITY_HEADERS = [
+    (b"x-content-type-options", b"nosniff"),  # a reply is only ever read as the type it says it is
+    (b"x-frame-options", b"DENY"),  # no other site can show these pages inside a frame
+    (b"referrer-policy", b"no-referrer"),  # links clicked in an answer don't tell the other site where from
+]
+
+
+class SecurityHeadersMiddleware:
+    """Add the standard protective headers to every response."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_headers(message):
+            if message["type"] == "http.response.start":
+                message = {**message, "headers": [*message.get("headers", []), *SECURITY_HEADERS]}
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
+
+
+# The last one added runs first. So every response, even the request-id
+# middleware's own 500, gets the security headers, and a 413 still has its X-Request-ID.
+app.add_middleware(BodySizeLimitMiddleware)
 app.add_middleware(CorrelationIdMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 def get_agent(request: Request) -> Agent:
@@ -161,10 +253,42 @@ def get_agent(request: Request) -> Agent:
 # ---------------------------------------------------------------------------
 
 
+def _sha256(text: str) -> str:
+    return "'sha256-" + base64.b64encode(hashlib.sha256(text.encode()).digest()).decode() + "'"
+
+
+def chat_page_csp(html: str) -> str:
+    """The Content-Security-Policy for the chat page: what the browser may load and run.
+
+    Only the page's own inline script and style (allowed by their hashes, so an
+    injected one won't run), the two pinned CDN libraries, Google Fonts and
+    requests back to this server. No images from other sites: an answer that
+    tried to show one could otherwise send data to that site when it loads.
+    """
+    scripts = " ".join(_sha256(code) for code in re.findall(r"<script>(.*?)</script>", html, re.DOTALL))
+    styles = " ".join(_sha256(css) for css in re.findall(r"<style>(.*?)</style>", html, re.DOTALL))
+    return "; ".join(
+        [
+            "default-src 'none'",
+            f"script-src {scripts} https://cdn.jsdelivr.net",
+            f"style-src {styles} https://fonts.googleapis.com",
+            "font-src https://fonts.gstatic.com",
+            "img-src 'self' data:",
+            "connect-src 'self'",
+            "form-action 'self'",
+            "base-uri 'none'",
+            "frame-ancestors 'none'",
+        ]
+    )
+
+
+CHAT_PAGE_CSP = chat_page_csp(CHAT_PAGE.read_text(encoding="utf-8"))
+
+
 @app.get("/", include_in_schema=False)
 def chat_page():
     """A small chat page that talks to POST /chat, so anyone can try the agent."""
-    return FileResponse(CHAT_PAGE, media_type="text/html")
+    return FileResponse(CHAT_PAGE, media_type="text/html", headers={"Content-Security-Policy": CHAT_PAGE_CSP})
 
 
 @app.get("/health")
@@ -175,7 +299,10 @@ def health():
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=2000, examples=["What's your return window?"])
     thread_id: str | None = Field(
-        default=None, description="Send the thread_id from a previous reply to continue that conversation."
+        default=None,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9._:-]+$",
+        description="Send the thread_id from a previous reply to continue that conversation.",
     )
 
 
@@ -246,11 +373,15 @@ def check_chat_api_key(x_api_key: str | None = Header(default=None)) -> None:
     "/chat",
     response_model=ChatResponse,
     response_model_exclude_none=True,
-    # Both run before the request body is handled, so a refused request never reaches the agent.
+    # Both run before the body is validated, so a refused request never reaches the agent.
+    # (FastAPI reads the body first; BodySizeLimitMiddleware keeps that read small.)
     dependencies=[Depends(limit_chat_rate), Depends(check_chat_api_key)],
     responses={
         401: {"description": "CHAT_API_KEY is set and X-API-Key is missing or wrong."},
+        409: {"description": "The conversation has reached MAX_THREAD_TURNS questions."},
+        413: {"description": "The request body is over 64 KB."},
         429: {"description": "Too many questions from this address in the last 60 seconds."},
+        503: {"description": "Every LLM provider is unavailable."},
         CLIENT_CLOSED_REQUEST: {"description": "The caller stopped waiting; the answer was cancelled."},
     },
 )
@@ -267,10 +398,12 @@ async def chat(body: ChatRequest, request: Request, agent: Agent = Depends(get_a
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await task
-            log.info("chat_cancelled", thread_id=body.thread_id)
+            log.info("chat_cancelled", thread=thread_ref(body.thread_id))
             return Response(status_code=CLIENT_CLOSED_REQUEST)
     try:
         result = task.result()
+    except ThreadTooLong as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except SteadfastError as exc:
         # Steadfast already retried (and tried the fallback provider) before giving up.
         log.error("llm_unavailable", error=str(exc))
@@ -300,10 +433,15 @@ class IngestResponse(BaseModel):
     chunks_written: int
 
 
+# Two ingests at once would both try to add the same new file and one would fail.
+ingest_lock = asyncio.Lock()
+
+
 @app.post("/ingest", response_model=IngestResponse, dependencies=[Depends(check_ingest_token)])
 async def ingest():
     """Re-read data/policies and update the search index (unchanged files are skipped)."""
     from app.retrieval.ingest import ingest_folder
 
-    stats = await asyncio.to_thread(ingest_folder)
+    async with ingest_lock:
+        stats = await asyncio.to_thread(ingest_folder)
     return IngestResponse(**stats.as_dict())

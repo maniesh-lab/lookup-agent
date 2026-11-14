@@ -1,5 +1,6 @@
 """The LangGraph agent with a fake LLM and fake tools (no API key needed)."""
 
+import asyncio
 import json
 
 import pytest
@@ -8,7 +9,7 @@ from pydantic import BaseModel
 
 from app.agent import create_agent
 from app.agent.graph import STEP_LIMIT_NOTE, build_graph
-from app.agent.runner import NO_ANSWER, Agent
+from app.agent.runner import NO_ANSWER, Agent, ThreadTooLong, thread_ref
 from app.tools.registry import Tool, ToolRegistry
 from tests.conftest import FakeLLM, text_reply, tool_reply
 
@@ -339,3 +340,60 @@ async def test_follow_up_sends_trimmed_history_but_saves_the_full_one():
     config = {"configurable": {"thread_id": first.thread_id}}
     saved = (await agent.graph.aget_state(config)).values["messages"]
     assert "30 days" in next(m for m in saved if m.get("tool_call_id") == "t1")["content"]
+
+
+# --- One turn at a time per thread, and a cap on questions per thread ------------
+
+
+async def test_a_thread_refuses_questions_past_its_limit():
+    llm = FakeLLM([text_reply("one"), text_reply("two"), text_reply("fresh")])
+    registry = fake_registry([])
+    graph = build_graph(llm, registry, prompt_version="v2", max_steps=4, checkpointer=InMemorySaver())
+    agent = Agent(graph, registry, prompt_version="v2", max_steps=4, max_turns=2)
+
+    first = await agent.ask("q1")
+    await agent.ask("q2", thread_id=first.thread_id)
+    with pytest.raises(ThreadTooLong, match="limit of 2"):
+        await agent.ask("q3", thread_id=first.thread_id)
+    assert len(llm.calls) == 2  # the refused question never reached the LLM
+    assert (await agent.ask("a new conversation")).answer == "fresh"
+
+
+class SlowLLM:
+    """Answers after a short wait and records how many calls overlapped."""
+
+    model = "slow"
+
+    def __init__(self):
+        self.active = self.most_active = 0
+
+    async def chat(self, messages, *, tools=None, tool_choice=None):
+        self.active += 1
+        self.most_active = max(self.most_active, self.active)
+        await asyncio.sleep(0.05)
+        self.active -= 1
+        return text_reply(f"answer to {messages[-1]['content']}")
+
+
+async def test_questions_on_one_thread_run_one_after_the_other():
+    llm = SlowLLM()
+    agent = make_agent(llm, fake_registry([]))
+    await asyncio.gather(agent.ask("a", thread_id="t"), agent.ask("b", thread_id="t"))
+    assert llm.most_active == 1
+    state = await agent.graph.aget_state({"configurable": {"thread_id": "t"}})
+    assert [m["role"] for m in state.values["messages"]] == ["user", "assistant", "user", "assistant"]
+    assert len(agent.thread_locks) == 0  # nothing left behind
+
+
+async def test_different_threads_still_run_side_by_side():
+    llm = SlowLLM()
+    agent = make_agent(llm, fake_registry([]))
+    await asyncio.gather(agent.ask("a", thread_id="t1"), agent.ask("b", thread_id="t2"))
+    assert llm.most_active == 2
+
+
+def test_thread_ids_are_kept_out_of_logs():
+    assert thread_ref(None) is None
+    ref = thread_ref("1b4e28ba-2fa1-11d2-883f-0016d3cca427")
+    assert len(ref) == 16 and "1b4e28ba" not in ref
+    assert ref == thread_ref("1b4e28ba-2fa1-11d2-883f-0016d3cca427")

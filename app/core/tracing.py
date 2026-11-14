@@ -46,8 +46,8 @@ def enabled() -> bool:
 
 
 @contextmanager
-def trace_turn(*, thread_id: str, question: str, prompt_version: str, correlation_id: str | None):
-    """Wrap one whole chat turn."""
+def trace_turn(*, session_id: str | None, question: str, prompt_version: str, correlation_id: str | None):
+    """Wrap one whole chat turn. session_id groups a conversation's turns (a hash of its thread_id)."""
     client = _client()
     if client is None:
         yield _NoOpObservation()
@@ -63,7 +63,7 @@ def trace_turn(*, thread_id: str, question: str, prompt_version: str, correlatio
             metadata={"prompt_version": prompt_version, "correlation_id": correlation_id},
         ) as span,
         propagate_attributes(
-            session_id=thread_id,
+            session_id=session_id,
             version=prompt_version,
             trace_name="chat_turn",
             metadata={"prompt_version": prompt_version},

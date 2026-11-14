@@ -323,10 +323,11 @@
       main { scroll-behavior: auto; }
       .thinking .lamp-dot { animation: none; opacity: 1; }
     }
+    .sprite { position: absolute; }
   </style>
 </head>
 <body>
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <svg width="0" height="0" class="sprite" aria-hidden="true">
     <symbol id="i-doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></symbol>
     <symbol id="i-db" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.5" rx="7" ry="2.5"/><path d="M5 5.5v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6M5 11.5v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6"/></symbol>
     <symbol id="i-rate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13l-3-3M20 16H7l3 3"/></symbol>
@@ -385,8 +386,13 @@
     </footer>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+  <!-- integrity: the browser refuses these files if the CDN ever serves anything else -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"
+    integrity="sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi"
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"
+    integrity="sha384-+VfUPEb0PdtChMwmBcBmykRMDd+v6D/oFmB3rZM/puCMDYcIvF968OimRh4KQY9a"
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script>
     "use strict";
 
@@ -443,9 +449,16 @@
       svg.append(use);
       return svg;
     }
+    // Answers can repeat text from the database, so they are treated as untrusted:
+    // no images (a link to another site could carry data out when it loads), no
+    // forms or inputs, no inline styles. The server's Content-Security-Policy backs this up.
+    const SANITIZE = {
+      FORBID_TAGS: ["img", "picture", "source", "video", "audio", "style", "form", "input", "button", "textarea", "select"],
+      FORBID_ATTR: ["style", "srcset"],
+    };
     function renderMarkdown(text) {
       if (window.marked && window.DOMPurify) {
-        return DOMPurify.sanitize(marked.parse(text, { gfm: true, breaks: true }));
+        return DOMPurify.sanitize(marked.parse(text, { gfm: true, breaks: true }), SANITIZE);
       }
       const safe = text.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
       return safe.split(/\n{2,}/).map(p => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("");
@@ -549,6 +562,11 @@
         retry: false,
       },
       429: { title: "Slow down", text: "Too many questions in the last minute. Wait a little, then try again.", retry: true },
+      409: {
+        title: "This conversation is full",
+        text: "It has reached the most questions one conversation can hold. Press \u201cNew conversation\u201d to keep going.",
+        retry: false,
+      },
     };
 
     function showFailure(status, body, text) {

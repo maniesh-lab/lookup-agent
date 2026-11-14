@@ -2,7 +2,8 @@
 
 Steadfast gives every call retries with backoff, a per-provider rate
 limit, a fallback provider, token counting and correlation-id logging,
-and it speaks one message/tool format for Groq, OpenAI and Anthropic.
+and it speaks one message/tool format for every provider it supports.
+This project registers two of them: Groq and OpenAI.
 
 The agent only depends on the small `LLM` protocol below, so tests can
 pass in a fake that returns scripted replies without any API key.

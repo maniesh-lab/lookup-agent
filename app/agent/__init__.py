@@ -23,7 +23,14 @@ def create_agent(*, checkpointer=None, llm=None, registry=None, prompt_version=N
         max_steps=settings.max_agent_steps,
         checkpointer=checkpointer,
     )
-    return Agent(graph, registry, prompt_version=version, max_steps=settings.max_agent_steps, llm=llm)
+    return Agent(
+        graph,
+        registry,
+        prompt_version=version,
+        max_steps=settings.max_agent_steps,
+        llm=llm,
+        max_turns=settings.max_thread_turns,
+    )
 
 
 __all__ = ["Agent", "ChatResult", "create_agent"]
