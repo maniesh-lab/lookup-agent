@@ -8,13 +8,27 @@ For each case:
               came back from search_docs
 - answer_ok:  every answer check passes:
     must_mention   each group needs at least one of its phrases in the answer
+                   (a phrase must start at a word, and a number phrase must be
+                   the whole number: "25" doesn't match "$175" or "25.50")
     truth/number   the truth-SQL number appears in the answer (converted to
-                   another currency first when convert_to is set)
-    truth/names    every name from the truth SQL appears in the answer
+                   another currency first when convert_to is set). With a
+                   "unit" (e.g. "order"), the number has to be the count of
+                   that thing ("3 orders", "orders: 3"), so a "3" from
+                   "3-5 business days" doesn't count; a different count of
+                   it ("7 orders") fails the check
+    truth/names    every name from the truth SQL appears in the answer; an
+                   empty truth fails (the database isn't seeded). With a
+                   universe (all names of that kind), naming any other one fails
     fx             the converted amount appears in the answer
     expect_refusal the answer says the information isn't available
     must_not_mention  none of these phrases appear (e.g. "has been deleted")
+    must_not_match    none of these regular expressions match (e.g. a made-up
+                      percentage in a refusal)
 - passed: tools_ok and sources_ok and answer_ok
+
+Dates written with month names ("January 1", "1 March 2026") are taken out
+before numbers are read, like ISO dates, so a question's own dates aren't
+mistaken for answer numbers.
 """
 
 import re
@@ -71,9 +85,31 @@ REFUSAL_PHRASES = [
     "cannot tell",
 ]
 
-NUMBER = re.compile(r"(?<![\w.])-?\d[\d,]*(?:\.\d+)?")
+# Thousands commas only in real groups: "26,568", Indian-style "1,23,456", but "12,15,18" is
+# three numbers, not 121518.
+NUMBER = re.compile(r"(?<![\w.])-?(?:\d{1,2}(?:,\d{2})+,\d{3}(?!\d)|\d{1,3}(?:,\d{3})+(?!\d)|\d+)(?:\.\d+)?")
+# "USD173.50", "Rs.23,456": a currency written right before the number would hide it.
+CURRENCY_PREFIX = re.compile(r"\b(USD|EUR|GBP|INR|AUD|CAD|CHF|JPY|Rs\.?)(?=\d)", re.IGNORECASE)
 # "2026-02-18" holds no answer numbers; without this, "02" and "18" count as numbers.
 ISO_DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
+# Neither do "January 1", "Feb 18th, 2026" or "1 March 2026": without this, the "1"
+# in "between January 1 and January 31" passed a wrong count when the answer was 1.
+_MONTH = (
+    r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?"
+    r"|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?"
+)
+MONTH_DATE = re.compile(
+    rf"\b{_MONTH}\s+\d{{1,2}}(?:st|nd|rd|th)?\b(?:,?\s+\d{{4}})?"
+    rf"|\b\d{{1,2}}(?:st|nd|rd|th)?\s+(?:of\s+)?{_MONTH}(?:,?\s+\d{{4}})?\b",
+    re.IGNORECASE,
+)
+NUMBER_WORDS = {
+    word: value
+    for value, word in enumerate(
+        "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen "
+        "fifteen sixteen seventeen eighteen nineteen twenty".split()
+    )
+}
 
 # Models often write special Unicode characters that look like normal ones:
 # a non-breaking hyphen in "USB‑C", a narrow no-break space in "Grace Okafor"
@@ -91,9 +127,14 @@ def normalize(text: str) -> str:
     return text.translate(HYPHENS).translate(QUOTES)
 
 
+def without_dates(text: str) -> str:
+    text = CURRENCY_PREFIX.sub(r"\1 ", normalize(text))
+    return MONTH_DATE.sub(" ", ISO_DATE.sub(" ", text))
+
+
 def extract_numbers(text: str) -> list[float]:
     numbers = []
-    for raw in NUMBER.findall(ISO_DATE.sub(" ", normalize(text))):
+    for raw in NUMBER.findall(without_dates(text)):
         cleaned = raw.replace(",", "")
         try:
             numbers.append(float(cleaned))
@@ -103,14 +144,56 @@ def extract_numbers(text: str) -> list[float]:
 
 
 def mentions_number(text: str, expected: float, rel_tol: float = 0.005, abs_tol: float = 0.011) -> bool:
-    for n in extract_numbers(text):
-        if abs(n - expected) <= max(abs_tol, abs(expected) * rel_tol):
+    return any(close_enough(n, expected, rel_tol, abs_tol) for n in extract_numbers(text))
+
+
+def close_enough(n: float, expected: float, rel_tol: float = 0.005, abs_tol: float = 0.011) -> bool:
+    return abs(n - expected) <= max(abs_tol, abs(expected) * rel_tol)
+
+
+# A count: digits or a number word, standing on its own (not part of "175" or "3.5").
+_COUNT = r"(?<![\w.,$])(\d[\d,]*(?:\.\d+)?|" + "|".join(NUMBER_WORDS) + r")(?![\w%]|[.,]\d)"
+
+
+def _count_value(raw: str) -> float:
+    return float(NUMBER_WORDS[raw]) if raw in NUMBER_WORDS else float(raw.replace(",", ""))
+
+
+def mentions_count(text: str, expected: float, unit: str) -> bool:
+    """The answer gives `expected` as the number of `unit`s.
+
+    "3 orders", "3 open delivery tickets", "1 cancelled order" (up to two words
+    in between) count; so does "orders still processing: 3" when no number
+    stands right before the unit anywhere. If one does and none of those is
+    the expected count, the answer claims a different number and fails.
+    """
+    t = without_dates(text).lower()
+    unit_re = rf"\b{re.escape(unit.lower())}(?:e?s)?\b"
+    before = [
+        _count_value(m.group(1))
+        for m in re.finditer(_COUNT + r"(?:[\W_]+[a-z][a-z-]*){0,2}?[\W_]+" + unit_re, t)
+    ]
+    if before:
+        return any(close_enough(n, expected) for n in before)
+    for m in re.finditer(unit_re + r"[^.!?\n]{0,60}?" + _COUNT, t):
+        if close_enough(_count_value(m.group(1)), expected):
             return True
     return False
 
 
 def mentions(text: str, phrase: str) -> bool:
-    return normalize(phrase).lower() in normalize(text).lower()
+    """The phrase appears, starting at a word ("yes" isn't found in "eyes"). A phrase
+    that starts or ends with a digit must be the whole number: "75" is found in "$75"
+    and "$75.00" but not in "$175", "75,000" or "75.50"."""
+    p = normalize(phrase).lower()
+    if not p:
+        return False
+    pattern = re.escape(p)
+    if p[0].isalnum():
+        pattern = r"(?<!\w)" + (r"(?<!\d[.,])" if p[0].isdigit() else "") + pattern
+    if p[-1].isdigit():
+        pattern += r"(?!\d)(?!,\d)(?!\.(?!0+(?!\d))\d)"
+    return re.search(pattern, normalize(text).lower()) is not None
 
 
 def mentions_name(text: str, name: str) -> bool:
@@ -118,6 +201,22 @@ def mentions_name(text: str, name: str) -> bool:
     "Glass Food Containers" counts for "Glass Food Containers (Set of 4)"."""
     short = re.sub(r"\s*\(.*?\)", "", name).strip()
     return mentions(text, name) or (bool(short) and mentions(text, short))
+
+
+def extra_names(text: str, expected: list, universe: list) -> list[str]:
+    """Names from the universe that the answer mentions but the truth doesn't hold.
+
+    The expected names are blanked out first, so "Yoga Mat" isn't found inside
+    an expected "Cork Yoga Mat".
+    """
+    rest = normalize(text)
+    for name in sorted((str(v) for v in expected), key=len, reverse=True):
+        short = re.sub(r"\s*\(.*?\)", "", name).strip()
+        for form in (name, short):
+            if form:
+                rest = re.sub(re.escape(normalize(form)), " ", rest, flags=re.IGNORECASE)
+    wanted = {str(v) for v in expected}
+    return [str(n) for n in universe if str(n) not in wanted and mentions_name(rest, str(n))]
 
 
 def is_refusal(text: str) -> bool:
@@ -174,17 +273,32 @@ def score_case(
     for truth in truth_values:
         if truth["check"] == "number":
             expected = truth["expected_number"]
-            # A converted amount is checked loosely: the rate can move during a run.
-            tol = 0.02 if truth.get("converted") else 0.005
-            ok = expected is not None and mentions_number(answer, expected, rel_tol=tol)
+            unit = truth.get("unit")
+            if expected is None:
+                ok = False
+            elif unit:
+                ok = mentions_count(answer, expected, unit)
+            else:
+                # A converted amount is checked loosely: the rate can move during a run.
+                tol = 0.02 if truth.get("converted") else 0.005
+                ok = mentions_number(answer, expected, rel_tol=tol)
             answer_checks.append(ok)
             if not ok:
-                failures.append(f"answer doesn't contain {expected}")
+                what = f"give {expected} as the number of {unit}s" if unit else f"contain {expected}"
+                failures.append(f"answer doesn't {what}")
         elif truth["check"] == "names":
+            if not truth["values"]:
+                answer_checks.append(False)
+                failures.append("the truth query found no names (is the database seeded?)")
+                continue
             missing = [v for v in truth["values"] if not mentions_name(answer, str(v))]
             answer_checks.append(not missing)
             if missing:
                 failures.append(f"answer is missing {missing}")
+            extra = extra_names(answer, truth["values"], truth.get("universe") or [])
+            answer_checks.append(not extra)
+            if extra:
+                failures.append(f"answer also names {extra}")
 
     if fx_expected is not None:
         ok = mentions_number(answer, fx_expected, rel_tol=0.02)
@@ -202,6 +316,12 @@ def score_case(
     answer_checks.append(not said)
     if said:
         failures.append(f"answer says {said}")
+
+    plain = normalize(answer)
+    matched = [rx for rx in case.get("must_not_match", []) if re.search(rx, plain, re.IGNORECASE)]
+    answer_checks.append(not matched)
+    if matched:
+        failures.append(f"answer matches {matched}")
 
     answer_ok = all(answer_checks)
     return CaseScore(

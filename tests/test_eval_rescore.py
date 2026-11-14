@@ -92,3 +92,118 @@ def test_convert_can_use_a_past_date():
     client = httpx.Client(transport=httpx.MockTransport(handler))
     result = convert(100, "USD", "CAD", on_date="2026-10-23", client=client)
     assert result["converted"] == 139.95 and result["rate_date"] == "2026-10-23"
+
+
+def use_fakes(tmp_path, monkeypatch):
+    import eval.run_eval as run_eval
+
+    monkeypatch.setattr(rescore, "Truth", FakeTruth)
+    monkeypatch.setattr(rescore, "load_cases", lambda ids, eval_set="main": CASES)
+    monkeypatch.setattr(rescore, "RESULTS", tmp_path)
+    monkeypatch.setattr(run_eval, "RESULTS", tmp_path)
+
+
+def test_rescore_skips_copies_that_are_already_rescored(tmp_path):
+    path = tmp_path / "v2-old-rescored.json"
+    path.write_text("{}")
+    assert rescore.rescore_file(path, None) is None
+
+
+def test_rescore_keeps_removed_cases_and_needs_no_rate_date_without_currency_cases(
+    tmp_path, monkeypatch, capsys
+):
+    use_fakes(tmp_path, monkeypatch)
+    run = {
+        "prompt": "v3",
+        "rate_date": None,
+        "records": [
+            old_record("q05", "DOCS", "A 14-day free trial.", ["search_docs"]),
+            old_record("q99", "DB", "a case that was removed later", []),
+        ],
+    }
+    path = tmp_path / "v3-old.json"
+    path.write_text(json.dumps(run))
+
+    out = rescore.rescore_file(path, None)
+
+    data = json.loads(out.read_text())
+    assert [r["id"] for r in data["records"]] == ["q05", "q99"]
+    assert data["records"][1]["answer"] == "a case that was removed later"
+    assert "q99: no longer in the eval set" in capsys.readouterr().out
+
+
+def test_rescore_points_out_expected_values_that_changed(tmp_path, monkeypatch, capsys):
+    use_fakes(tmp_path, monkeypatch)
+    record = old_record("q10", "DB", "Orbit USB-C Hub, Swift Wireless Mouse, Bamboo Cutting Board", [])
+    record["expected"] = {"truth": [{"check": "names", "values": ["Other"], "expected_number": None}]}
+    path = tmp_path / "v3-old.json"
+    path.write_text(json.dumps({"prompt": "v3", "records": [record]}))
+    rescore.rescore_file(path, "2026-10-23")
+    assert "q10: expected values differ" in capsys.readouterr().out
+
+
+# --- The eval runner: errors fail a case, and a run that stops early is still saved ---------
+
+
+class BrokenTruth:
+    rate_date = None
+
+    def for_case(self, case):
+        raise RuntimeError("Currency API failed while scoring")
+
+
+class FailingAgent:
+    llm = None
+
+    async def ask(self, question, thread_id=None):
+        raise RuntimeError("provider down")
+
+
+async def test_an_error_fails_the_case_even_with_only_must_not_checks():
+    import eval.run_eval as run_eval
+
+    only_must_not = {"id": "s1", "category": "SAFETY", "question": "delete it"}
+    only_must_not["must_not_mention"] = ["deleted"]
+    record = await run_eval.run_case(FailingAgent(), BrokenTruth(), only_must_not)
+    assert record["passed"] is False and record["answer_ok"] is False
+    assert record["failures"][0] == "RuntimeError: provider down"
+    assert record["failures"][1].startswith("expected values unavailable")
+
+
+async def test_a_run_that_stops_early_saves_what_it_has(tmp_path, monkeypatch):
+    import asyncio
+
+    import eval.run_eval as run_eval
+
+    class StopsOnSecond:
+        llm = None
+
+        def __init__(self):
+            self.asked = 0
+
+        async def ask(self, question, thread_id=None):
+            self.asked += 1
+            if self.asked == 2:
+                raise asyncio.CancelledError  # like Ctrl+C
+            reply = {"answer": "A 14-day trial.", "tools_used": [], "sources": [], "thread_id": "t"}
+            return type("Reply", (), reply)
+
+    class EmptyTruth:
+        rate_date = None
+
+        def for_case(self, case):
+            return [], None
+
+    monkeypatch.setattr(run_eval, "RESULTS", tmp_path)
+    monkeypatch.setattr(run_eval, "load_cases", lambda ids, eval_set="main": CASES[::-1])
+    monkeypatch.setattr(run_eval, "create_agent", lambda **kwargs: StopsOnSecond())
+    monkeypatch.setattr(run_eval, "Truth", EmptyTruth)
+
+    try:
+        await run_eval.run("v3", None, 0)
+    except asyncio.CancelledError:
+        pass
+    [saved] = [p for p in tmp_path.glob("v3-*.json")]
+    data = json.loads(saved.read_text())
+    assert len(data["records"]) == 1 and data["partial"].startswith("1 of 2")
+    assert "(partial, 1/2)" in (tmp_path / "summary.md").read_text()
