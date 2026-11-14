@@ -1,5 +1,5 @@
 fastapi>=0.115                    # the web API
-uvicorn[standard]>=0.30           # runs the FastAPI server
+uvicorn[standard]>=0.54.0           # runs the FastAPI server
 pydantic-settings>=2.4            # reads .env into a settings object
 psycopg[binary]>=3.2              # Postgres driver
 psycopg-pool>=3.2                 # connection pools (conversation memory and search)
