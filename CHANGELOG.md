@@ -98,7 +98,7 @@ Found in a final end-to-end review: attacks run against a throwaway database and
 - **Docker**: the app was published on every network interface while `/chat` and `/ingest` were open by default. It is now on 127.0.0.1; the README says how to open it up safely.
 - **Chat page**: the CDN libraries are pinned with integrity hashes; images, forms and inline styles are stripped from answers; the page has a Content-Security-Policy (its own script by hash, no outside images); every response has `X-Content-Type-Options`, `X-Frame-Options` and `Referrer-Policy`.
 - **Thread ids** no longer appear in logs or Langfuse (a short hash instead): whoever has one can continue the conversation.
-- **CI**: the workflow's token is read-only, actions are pinned to exact commits, and Dependabot opens weekly update PRs for pip packages and actions.
+- **CI**: the workflow's token is read-only, actions are pinned to exact commits, and Dependabot opens update PRs for pip packages and actions (grouped since 2026-11-15: one PR per month for each).
 
 **Correctness**
 - Two questions on one thread at the same time could lose a turn; they now run one after the other. A thread holds at most `MAX_THREAD_TURNS` questions (default 50, then 409), and `scripts/prune_threads.py` deletes conversations unused for N days.
