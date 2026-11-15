@@ -1,12 +1,20 @@
-# Weekly pull requests for outdated or vulnerable dependencies.
+# Once a month, one pull request for all outdated Python packages and one for
+# all outdated GitHub Actions (the actions are pinned to exact commits, so they
+# only get fixes through these updates). Grouped so routine bumps don't arrive
+# as a separate pull request each.
 version: 2
 updates:
   - package-ecosystem: pip
     directory: /
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    groups:
+      python-packages:
+        patterns: ["*"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    groups:
+      github-actions:
+        patterns: ["*"]
